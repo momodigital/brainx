@@ -165,23 +165,24 @@ def gen2d(top6):
             result.append(s)
     return result
 
-
 def gen3d(f2, top3):
     """
     Generate 3D combo dari 2D dan top 3
+    TANPA BATASAN - TAMPILKAN SEMUA
     """
     if not f2 or not top3:
         return []
     
     res, seen = [], set()
-    for s in f2[:100]:  # Batasi untuk performa
+    for s in f2:  # ← HAPUS [:100], ambil semua 2D
         a, b = int(s[0]), int(s[1])
         for x in top3:
-            for p in [f"{a}{b}{x}", f"{a}{x}{b}", f"{b}{a}{x}", f"{b}{x}{a}", f"{x}{a}{b}", f"{x}{b}{a}"]:
+            for p in [f"{a}{b}{x}", f"{a}{x}{b}", f"{b}{a}{x}", 
+                     f"{b}{x}{a}", f"{x}{a}{b}", f"{x}{b}{a}"]:
                 if p not in seen:
                     seen.add(p)
                     res.append(p)
-    return sorted(res, key=int)[:500]  # Batasi 500 kombinasi
+    return sorted(res, key=int)  # ← HAPUS [:500], return semua
 
 
 # ========== VALIDASI AKURASI ==========
