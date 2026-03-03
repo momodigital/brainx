@@ -2,45 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 🎯 PREDIKTOR 6 ANGKA - MAIN APPLICATION
-Dengan fitur Validasi dan Bobot Adaptif
+Versi Final dengan:
+✅ Indikator ML tampil di layar
+✅ ML untuk 7 Kepala dan 7 Ekor
+✅ Bobot Adaptif
+✅ Ensemble ML + Statistik
+✅ Tanpa auto-check module (untuk Anaconda/PC)
 """
-
-# ========== CEK DAN INSTALL MODULE ==========
-import subprocess
-import sys
-
-def check_and_install_modules():
-    """Memeriksa dan menginstall module yang dibutuhkan"""
-    required_modules = ['requests', 'numpy', 'scikit-learn']
-    missing_modules = []
-    
-    for module in required_modules:
-        try:
-            __import__(module)
-        except ImportError:
-            missing_modules.append(module)
-    
-    if missing_modules:
-        print("="*50)
-        print("📦 MODULE YANG DIBUTUHKAN:")
-        for module in missing_modules:
-            print(f"   - {module}")
-        print("="*50)
-        
-        answer = input("\n💾 Install module sekarang? (y/n): ").lower()
-        if answer == 'y':
-            for module in missing_modules:
-                print(f"📦 Menginstall {module}...")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", module])
-            print("✅ Module berhasil diinstall!")
-            print("🔄 Silakan jalankan ulang script...")
-            sys.exit(0)
-        else:
-            print("❌ Module tidak diinstall. Script tidak dapat dijalankan.")
-            sys.exit(1)
-
-# Jalankan pengecekan module
-check_and_install_modules()
 
 # ========== IMPORT MODULE ==========
 import requests
@@ -51,12 +19,13 @@ from datetime import datetime
 
 # Import metode dari brainx.py
 try:
-    from brainx import hitung_semua, ModelValidator
+    from brainx import hitung_semua
 except ImportError:
     print("❌ File 'brainx.py' tidak ditemukan!")
     print("Pastikan kedua file berada di folder yang sama:")
     print("  - prediktor.py")
     print("  - brainx.py")
+    import sys
     sys.exit(1)
 
 # ========== KONFIGURASI GITHUB ==========
@@ -156,7 +125,7 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
     lines.append("="*50)
     lines.append("  🔷 PREDIKTOR 6 ANGKA - HASIL LENGKAP")
     if hasil['final']['metode'] == 'ensemble':
-        lines.append(f"  🤖 ENSEMBLE ADAPTIF (ML:{(hasil['ensemble']['ml_weight']*100):.0f}% / STAT:{hasil['ensemble']['stat_weight']*100:.0f}%)")
+        lines.append(f"  🤖 ENSEMBLE ADAPTIF (ML:{hasil['ensemble']['ml_weight']*100:.0f}% / STAT:{hasil['ensemble']['stat_weight']*100:.0f}%)")
     lines.append("="*50)
     
     # Info
@@ -166,10 +135,9 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
     if hasil['ensemble']:
         lines.append(f"Confidence ML: {hasil['ensemble']['confidence']:.2%}")
         lines.append(f"Certainty: {hasil['ensemble']['certainty']:.2%}")
-        # Tampilkan bobot adaptif
         if 'weights' in hasil['ensemble']:
-            weights = hasil['ensemble']['weights']
-            lines.append(f"Bobot Adaptif: Stat={weights.get('statistik',0):.0%}, RF={weights.get('ml_rf',0):.0%}, LR={weights.get('ml_lr',0):.0%}")
+            w = hasil['ensemble']['weights']
+            lines.append(f"Bobot Adaptif: Stat={w.get('statistik',0):.0%}, RF={w.get('ml_rf',0):.0%}, LR={w.get('ml_lr',0):.0%}")
     lines.append("")
     
     # Hasil prediksi
@@ -195,7 +163,7 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
     if hasil['final']['c3']:
         lines.append("")
         lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
-        lines.append("*".join(hasil['final']['c3']))
+        lines.append("*".join(hasil['final']['c3'][:200]) + ("..." if len(hasil['final']['c3']) > 200 else ""))
     
     # Kepala*Ekor
     lines.append("")
@@ -209,7 +177,7 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
     
     return "\n".join(lines)
 
-# ========== FUNGSI TAMPILAN HASIL ML ==========
+# ========== FUNGSI TAMPILAN HASIL ML (DIPERBAIKI) ==========
 def tampilkan_hasil_ml(hasil):
     """Menampilkan detail hasil Machine Learning"""
     if not hasil['ml'] or not hasil['ml']['result']:
@@ -217,14 +185,7 @@ def tampilkan_hasil_ml(hasil):
     
     ml_result = hasil['ml']['result']
     
-    cprint("\n📊 DETAIL MACHINE LEARNING (ANTI-OVERFITTING):", Colors.MAGENTA + Colors.BOLD)
-    
-    # Tampilkan Cross Validation scores
-    if ml_result.get('cv_scores'):
-        cprint("   Cross Validation Scores:", Colors.CYAN)
-        for i, cv in enumerate(ml_result['cv_scores']):
-            posisi = ['Ribuan', 'Ratusan', 'Puluhan', 'Satuan'][i]
-            cprint(f"     {posisi}: RF={cv['rf']:.2%}, LR={cv['lr']:.2%}, GB={cv['gb']:.2%} (Best: {cv['best']})", Colors.WHITE)
+    cprint("\n📊 DETAIL MACHINE LEARNING:", Colors.MAGENTA + Colors.BOLD)
     
     # Tampilkan akurasi per posisi
     cprint("   Akurasi Model per Posisi (CV mean):", Colors.CYAN)
@@ -250,60 +211,47 @@ def tampilkan_hasil_ml(hasil):
         cprint(f"     {posisi}: {Colors.BOLD}{pred}{Colors.RESET} (prob: {prob:.2%})", Colors.WHITE)
         cprint(f"        Top 5: {' - '.join(map(str, top_digits))}", Colors.WHITE)
     
+    # Tampilkan prediksi ML untuk KEPALA dan EKOR
+    if 'kepala_ml' in hasil['ml'] and hasil['ml']['kepala_ml']:
+        cprint(f"\n   🎯 PREDIKSI ML UNTUK KEPALA:", Colors.YELLOW)
+        cprint(f"        Top 7: {' - '.join(map(str, hasil['ml']['kepala_ml']))}", Colors.WHITE)
+    
+    if 'ekor_ml' in hasil['ml'] and hasil['ml']['ekor_ml']:
+        cprint(f"\n   🎯 PREDIKSI ML UNTUK EKOR:", Colors.YELLOW)
+        cprint(f"        Top 7: {' - '.join(map(str, hasil['ml']['ekor_ml']))}", Colors.WHITE)
+    
     # Tampilkan prediksi 4 digit lengkap
     prediksi_lengkap = ''.join(map(str, ml_result['predictions']))
     cprint(f"\n   🔢 PREDIKSI 4 DIGIT ML: {Colors.BOLD + Colors.YELLOW}{prediksi_lengkap}{Colors.RESET}", Colors.WHITE)
 
 
+# ========== FUNGSI TAMPILAN HASIL (DIPERBAIKI) ==========
 def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
     """Menampilkan hasil di layar dengan warna"""
     
     cprint("\n" + "="*50, Colors.CYAN)
     cprint(f"🔷 HASIL AKHIR: {m_name}", Colors.BOLD + Colors.MAGENTA)
     
-    if hasil['final']['metode'] == 'ensemble':
-        # Header dengan bobot adaptif
-        cprint(f"🤖 ENSEMBLE ADAPTIF", Colors.BOLD + Colors.GREEN)
-        
-        # Baris 1: Bobot dan Confidence
-        ml_persen = hasil['ensemble']['ml_weight']*100
-        stat_persen = hasil['ensemble']['stat_weight']*100
-        cprint(f"📊 Bobot: ML {ml_persen:.0f}% | STAT {stat_persen:.0f}%", Colors.CYAN)
-        
-        # Baris 2: Confidence & Certainty
-        cprint(f"📈 Confidence: {hasil['ensemble']['confidence']:.2%} | Certainty: {hasil['ensemble']['certainty']:.2%}", Colors.YELLOW)
-        
-        # Baris 3: Detail bobot per metode (jika ada)
-        if 'weights' in hasil['ensemble']:
-            w = hasil['ensemble']['weights']
-            stat = w.get('statistik', 0) * 100
-            rf = w.get('ml_rf', 0) * 100
-            lr = w.get('ml_lr', 0) * 100
-            
-            # Dapatkan angka dari masing-masing metode
-            stat_angka = ' '.join(map(str, hasil['statistik']['h6']['h6'][:3])) + "..."
-            
-            ml_angka = ""
-            if hasil['ml'] and hasil['ml']['result']:
-                ml_pred = ''.join(map(str, hasil['ml']['result']['predictions']))
-                ml_angka = f"ML:{ml_pred}"
-            else:
-                ml_angka = "ML:?"
-            
-            ensemble_angka = ' '.join(map(str, hasil['final']['h6']))
-            
-            cprint(f"⚖️  Bobot Detail:", Colors.MAGENTA)
-            cprint(f"   📊 Stat {stat:.0f}% : {stat_angka}", Colors.WHITE)
-            cprint(f"   🤖 RF   {rf:.0f}% : {ml_angka}", Colors.WHITE)
-            cprint(f"   📈 LR   {lr:.0f}% : {ml_angka}", Colors.WHITE)
-            cprint(f"   🔮 Ensemble : {Colors.BOLD}{ensemble_angka}{Colors.RESET}", Colors.GREEN)
+    # Tampilkan indikator ML dengan jelas
+    if hasil['ml'] and hasil['ml']['result']:
+        # Ada ML
+        if hasil['final']['metode'] == 'ensemble':
+            cprint(f"🤖 ENSEMBLE ADAPTIF (ML:{hasil['ensemble']['ml_weight']*100:.0f}% / STAT:{hasil['ensemble']['stat_weight']*100:.0f}%)", 
+                   Colors.BOLD + Colors.GREEN)
+            cprint(f"📊 Confidence ML: {hasil['ensemble']['confidence']:.2%} | Certainty: {hasil['ensemble']['certainty']:.2%}", Colors.CYAN)
+            if 'weights' in hasil['ensemble']:
+                w = hasil['ensemble']['weights']
+                cprint(f"⚖️ Bobot Adaptif: Stat={w.get('statistik',0):.0%}, RF={w.get('ml_rf',0):.0%}, LR={w.get('ml_lr',0):.0%}", Colors.YELLOW)
+        else:
+            cprint(f"🤖 ML AKTIF (TAPI ENSEMBLE GAGAL)", Colors.BOLD + Colors.YELLOW)
     else:
-        cprint("📊 METODE STATISTIK", Colors.BOLD + Colors.YELLOW)
+        # Tidak ada ML
+        if hasil['final']['metode'] == 'ensemble':
+            cprint("📊 METODE STATISTIK + ENSEMBLE DASAR", Colors.BOLD + Colors.YELLOW)
+        else:
+            cprint("📊 METODE STATISTIK", Colors.BOLD + Colors.YELLOW)
     
     cprint("="*50, Colors.CYAN)
-    
-    # Sisanya sama...
-    # [kode selanjutnya tidak berubah]
     
     # ===== HASIL UTAMA =====
     cprint(f"\n🔷 6 ANGKA: {Colors.BOLD + Colors.YELLOW}{' - '.join(map(str, hasil['final']['h6']))}{Colors.RESET}", Colors.WHITE)
@@ -336,9 +284,14 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
         ensemble_h6 = ' - '.join(map(str, hasil['ensemble']['h6']['h6']))
         cprint(f"   🔮 Ensemble  : {Colors.BOLD + Colors.GREEN}{ensemble_h6}{Colors.RESET}", Colors.WHITE)
     
-    # ===== KEPALA & EKOR =====
+    # ===== KEPALA & EKOR dengan info ML =====
     cprint(f"\n🎯 7 KEPALA: {Colors.BOLD + Colors.BLUE}{' - '.join(map(str, hasil['final']['kepala']))}{Colors.RESET}", Colors.WHITE)
+    if hasil['ml'] and 'kepala_ml' in hasil['ml'] and hasil['ml']['kepala_ml']:
+        cprint(f"   🤖 ML rekomendasi: {' - '.join(map(str, hasil['ml']['kepala_ml'][:5]))} ...", Colors.WHITE)
+
     cprint(f"🎯 7 EKOR : {Colors.BOLD + Colors.RED}{' - '.join(map(str, hasil['final']['ekor']))}{Colors.RESET}", Colors.WHITE)
+    if hasil['ml'] and 'ekor_ml' in hasil['ml'] and hasil['ml']['ekor_ml']:
+        cprint(f"   🤖 ML rekomendasi: {' - '.join(map(str, hasil['ml']['ekor_ml'][:5]))} ...", Colors.WHITE)
     
     # ===== 2D =====
     c2 = hasil['final']['c2']
@@ -361,7 +314,7 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
     if hasil['final']['c3']:
         c3 = hasil['final']['c3']
         cprint(f"\n🎲 3D COMBO ({Colors.MAGENTA}{len(c3)}{Colors.RESET} kombinasi):", Colors.WHITE)
-        if len(c3) <= 50:
+        if len(c3) <= 30:
             cprint("  " + " ".join(c3), Colors.WHITE)
         else:
             cprint("  " + " ".join(c3[:30]) + f" ... ({len(c3)-30} lainnya)", Colors.WHITE)
@@ -377,54 +330,6 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
     # ===== TAMPILKAN DETAIL ML =====
     if hasil['ml'] and hasil['ml']['result']:
         tampilkan_hasil_ml(hasil)
-
-
-# ========== FUNGSI VALIDASI ==========
-def menu_validasi(data):
-    """Menu untuk menjalankan validasi akurasi"""
-    if len(data) < 60:
-        cprint("❌ Data terlalu sedikit untuk validasi (minimal 60 putaran)", Colors.RED)
-        return
-    
-    cprint("\n" + "="*50, Colors.CYAN)
-    cprint("📊 VALIDASI AKURASI METODE", Colors.BOLD + Colors.YELLOW)
-    cprint("="*50, Colors.CYAN)
-    
-    methods_to_validate = {
-        '6 ANGKA': lambda d: calc6(d)['h6'],
-        '3D TOP': lambda d: calc3(d)['h3'],
-        'KEPALA': calc_kepala,
-        'EKOR': calc_ekor
-    }
-    
-    # Import ulang fungsi dari brainx
-    from brainx import calc6, calc3, calc_kepala, calc_ekor
-    
-    results = ModelValidator.compare_methods(data, methods_to_validate)
-    
-    # Urutkan berdasarkan mean accuracy
-    sorted_methods = sorted(results.items(), 
-                           key=lambda x: x[1]['mean_accuracy'], 
-                           reverse=True)
-    
-    for name, result in sorted_methods:
-        trend_symbol = "📈" if result['trend'] > 0 else "📉" if result['trend'] < 0 else "➡️"
-        cprint(f"\n{name}:", Colors.BOLD + Colors.WHITE)
-        cprint(f"  Mean Accuracy : {Colors.GREEN}{result['mean_accuracy']:.2%}{Colors.RESET} {trend_symbol}", Colors.WHITE)
-        cprint(f"  Std Deviation : {result['std_accuracy']:.2%}", Colors.WHITE)
-        cprint(f"  Last 10 Acc   : {Colors.YELLOW}{result['last_10_accuracy']:.2%}{Colors.RESET}", Colors.WHITE)
-        cprint(f"  Total Tests   : {result['total_tests']}", Colors.WHITE)
-        
-        # Tampilkan sample prediksi
-        if result['predictions']:
-            cprint("  Sample Prediksi (5 terakhir):", Colors.CYAN)
-            for i, (pred, actual) in enumerate(zip(result['predictions'][-5:], 
-                                                   result['actuals'][-5:])):
-                if isinstance(pred, list):
-                    pred_str = ' '.join(map(str, pred[:3])) + "..."
-                else:
-                    pred_str = str(pred)
-                cprint(f"    {i+1}. Pred: {pred_str} | Aktual: {actual}", Colors.WHITE)
 
 
 # ========== FUNGSI MENU KONFIGURASI ==========
@@ -469,10 +374,12 @@ def main():
     optimizer = None  # Akan diisi oleh brainx
     
     while True:
-        os.system('clear')
+        # Clear screen (cara yang kompatibel Windows/Linux)
+        os.system('cls' if os.name == 'nt' else 'clear')
         
         cprint("\n" + "="*50, Colors.CYAN)
-        cprint("   🔷 PREDIKSI ANGKA MAIN - TERMUX", Colors.BOLD + Colors.CYAN)
+        cprint("   🔷 PREDIKSI ANGKA MAIN - TERMUX EDITION", Colors.BOLD + Colors.CYAN)
+        cprint("   💻 Running on PC/Anaconda", Colors.BOLD + Colors.GREEN)
         if ml_mode == 'adaptive':
             cprint("   🤖 ML ADAPTIF (bobot otomatis)", Colors.BOLD + Colors.GREEN)
         elif ml_mode == 'manual':
@@ -484,17 +391,16 @@ def main():
         cprint("\n📋 MENU UTAMA:", Colors.YELLOW)
         cprint("   1. 🔍 Prediksi Pasaran", Colors.WHITE)
         cprint("   2. ⚙️  Konfigurasi ML", Colors.WHITE)
-        cprint("   3. 📊 Validasi Akurasi", Colors.WHITE)
-        cprint("   4. ❌ Keluar", Colors.WHITE)
+        cprint("   3. ❌ Keluar", Colors.WHITE)
         
         try:
-            menu = int(input(Colors.GREEN + "\n➤ Pilih menu (1-4): " + Colors.RESET))
+            menu = int(input(Colors.GREEN + "\n➤ Pilih menu (1-3): " + Colors.RESET))
         except:
             cprint("❌ Input salah!", Colors.RED)
             input("\nTekan Enter untuk lanjut...")
             continue
         
-        if menu == 4:
+        if menu == 3:
             cprint("\n👋 Sampai jumpa!", Colors.CYAN)
             break
             
@@ -508,35 +414,6 @@ def main():
                 else:
                     cprint("✅ Konfigurasi tersimpan!", Colors.GREEN)
             input("\nTekan Enter untuk lanjut...")
-            continue
-            
-        elif menu == 3:
-            # Minta user pilih pasaran untuk validasi
-            cprint("\n📊 PILIH PASARAN UNTUK VALIDASI:", Colors.YELLOW)
-            for k, v in MARKET_NAMES.items():
-                cprint(f"   {k}. {v}", Colors.WHITE)
-            
-            try:
-                choice = int(input(Colors.GREEN + "\n➤ Nomor Pasaran (1-10): " + Colors.RESET))
-                if choice not in MARKET_FILES:
-                    raise ValueError
-            except:
-                cprint("❌ Input salah!", Colors.RED)
-                input("\nTekan Enter untuk lanjut...")
-                continue
-            
-            m_name = MARKET_NAMES[choice]
-            cprint(f"\n🔄 Loading {m_name} untuk validasi...", Colors.CYAN)
-            
-            csv = fetch_github_csv(choice)
-            if not csv:
-                cprint("❌ Gagal ambil data.", Colors.RED)
-                input("\nTekan Enter untuk lanjut...")
-                continue
-            
-            data, _ = parse_csv(csv)
-            menu_validasi(data)
-            input("\nTekan Enter untuk kembali ke menu...")
             continue
             
         elif menu == 1:
@@ -602,22 +479,13 @@ def main():
                 mode = "adaptif" if ml_mode == 'adaptive' else "manual" if ml_mode == 'manual' else "stat"
                 fname = f"prediktor_{mode}_{choice}_{datetime.now().strftime('%H%M%S')}.txt"
                 
-                # Tentukan path
-                if os.path.exists('/sdcard'):
-                    download_dir = '/sdcard/Download'
-                    if not os.path.exists(download_dir):
-                        download_dir = '/sdcard'
-                    path = os.path.join(download_dir, fname)
-                else:
-                    path = fname
-                
                 # Buat konten file
                 file_content = format_file_output(m_name, len(data), hasil, filt, f_c2)
                 
                 try:
-                    with open(path, 'w', encoding='utf-8') as f:
+                    with open(fname, 'w', encoding='utf-8') as f:
                         f.write(file_content)
-                    cprint(f"\n✅ Tersimpan di: {Colors.GREEN}{path}{Colors.RESET}", Colors.WHITE)
+                    cprint(f"\n✅ Tersimpan di: {Colors.GREEN}{os.path.abspath(fname)}{Colors.RESET}", Colors.WHITE)
                     
                     # Pratinjau
                     cprint("\n📄 Pratinjau (5 baris pertama):", Colors.CYAN)
@@ -640,6 +508,7 @@ if __name__ == "__main__":
             cprint("Pastikan kedua file berada di folder yang sama:", Colors.YELLOW)
             cprint("  - prediktor.py", Colors.WHITE)
             cprint("  - brainx.py", Colors.WHITE)
+            import sys
             sys.exit(1)
             
         main()
