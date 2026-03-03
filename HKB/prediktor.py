@@ -159,11 +159,11 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
         if f_c2:
             lines.append("*".join(f_c2))
     
-    # 3D Combo
-    if hasil['final']['c3']:
-        lines.append("")
-        lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
-        lines.append("*".join(hasil['final']['c3'][:200]) + ("..." if len(hasil['final']['c3']) > 200 else ""))
+# 3D Combo - Tampilkan SEMUA di file
+if hasil['final']['c3']:
+    lines.append("")
+    lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
+    lines.append("*".join(hasil['final']['c3']))  # ← HAPUS [:200]
     
     # Kepala*Ekor (64 kombinasi)
     lines.append("")
@@ -310,14 +310,14 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
             else:
                 cprint("  " + " ".join(f_c2[:30]) + f" ... ({len(f_c2)-30} lainnya)", Colors.WHITE)
     
-    # ===== 3D COMBO =====
-    if hasil['final']['c3']:
-        c3 = hasil['final']['c3']
-        cprint(f"\n🎲 3D COMBO ({Colors.MAGENTA}{len(c3)}{Colors.RESET} kombinasi):", Colors.WHITE)
-        if len(c3) <= 30:
-            cprint("  " + " ".join(c3), Colors.WHITE)
-        else:
-            cprint("  " + " ".join(c3[:30]) + f" ... ({len(c3)-30} lainnya)", Colors.WHITE)
+# ===== 3D COMBO =====
+if hasil['final']['c3']:
+    c3 = hasil['final']['c3']
+    cprint(f"\n🎲 3D COMBO ({Colors.MAGENTA}{len(c3)}{Colors.RESET} kombinasi):", Colors.WHITE)
+    if len(c3) <= 50:  # Tetap batasi tampilan layar agar tidak kepanjangan
+        cprint("  " + " ".join(c3), Colors.WHITE)
+    else:
+        cprint("  " + " ".join(c3[:50]) + f" ... ({len(c3)-50} lainnya)", Colors.WHITE)  # Tampilkan 50 di layar
     
     # ===== KEPALA*EKOR (64 kombinasi) =====
     ke = hasil['final']['ke_combo']
