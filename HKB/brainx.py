@@ -1,12 +1,14 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-📦 MODUL METODE PREDIKSI
-Dengan fitur:
-1. ✅ Validasi Akurasi Historis
-2. ✅ Bobot Adaptif berdasarkan Performa
-3. ✅ Anti-Overfitting (Cross Validation, Regularization, Early Stopping)
+📦 MODUL METODE PREDIKSI - BRAINX
+Versi Final dengan:
+✅ Machine Learning (RF, LR, GB)
+✅ Anti-Overfitting (Cross Validation, Regularization)
+✅ Bobot Adaptif berdasarkan Performa
+✅ ML untuk 7 Kepala dan 7 Ekor
+✅ Ensemble ML + Statistik
+✅ Feature Extraction 66 fitur
 """
 
 import numpy as np
@@ -19,7 +21,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 import warnings
 warnings.filterwarnings('ignore')
 
-# ========== METODE STATISTIK (DARI KODE ASLI) ==========
+# ========== METODE STATISTIK ==========
 
 def calc6(data):
     """
@@ -177,10 +179,10 @@ def gen3d(f2, top3):
                 if p not in seen:
                     seen.add(p)
                     res.append(p)
-    return sorted(res, key=int)
+    return sorted(res, key=int)[:500]  # Batasi 500 kombinasi
 
 
-# ========== FITUR 1: VALIDASI AKURASI HISTORIS ==========
+# ========== VALIDASI AKURASI ==========
 
 class ModelValidator:
     """
@@ -191,15 +193,6 @@ class ModelValidator:
     def backtest(data, metode_func, window_size=50, step=1):
         """
         Backtesting: Uji akurasi metode pada data historis
-        
-        Args:
-            data: list of string angka 4 digit
-            metode_func: fungsi yang mengembalikan prediksi (ex: calc6, calc3)
-            window_size: jumlah data untuk training
-            step: langkah pergeseran
-            
-        Returns:
-            dict: hasil validasi
         """
         if len(data) < window_size + 10:
             return None
@@ -209,36 +202,28 @@ class ModelValidator:
         accuracies = []
         
         for i in range(window_size, len(data)-1, step):
-            # Data training = data[i-window_size : i]
             train_data = data[i-window_size:i]
-            
-            # Data test = data[i] (angka berikutnya)
             test_actual = data[i]
             
-            # Prediksi berdasarkan train_data
             if metode_func.__name__ == 'calc6':
                 pred_dict = metode_func(train_data)
-                pred = pred_dict['h6']  # List 6 digit
+                pred = pred_dict['h6']
             elif metode_func.__name__ == 'calc3':
                 pred_dict = metode_func(train_data)
-                pred = pred_dict['h3']  # List 3 digit
+                pred = pred_dict['h3']
             else:
-                pred = metode_func(train_data)  # List langsung
+                pred = metode_func(train_data)
             
             predictions.append(pred)
             actuals.append(test_actual)
             
-            # Hitung akurasi untuk prediksi ini
             if metode_func.__name__ == 'calc6':
-                # Untuk 6 ANGKA: benar jika digit muncul di angka aktual
                 correct = sum(1 for d in pred if str(d) in test_actual)
                 acc = correct / len(pred)
             elif metode_func.__name__ == 'calc3':
-                # Untuk 3D: benar jika digit ada di 3 digit terakhir
                 correct = sum(1 for d in pred if str(d) in test_actual[1:])
                 acc = correct / len(pred)
             else:
-                # Untuk Kepala/Ekor: benar jika digit sama
                 if metode_func.__name__ == 'calc_kepala':
                     actual_digit = int(test_actual[2]) if len(test_actual) > 2 else -1
                 elif metode_func.__name__ == 'calc_ekor':
@@ -253,69 +238,28 @@ class ModelValidator:
             
             accuracies.append(acc)
         
-        # Statistik
         result = {
             'mean_accuracy': np.mean(accuracies) if accuracies else 0,
             'std_accuracy': np.std(accuracies) if accuracies else 0,
             'last_10_accuracy': np.mean(accuracies[-10:]) if len(accuracies) >= 10 else np.mean(accuracies) if accuracies else 0,
             'trend': np.polyfit(range(len(accuracies[-20:])), accuracies[-20:], 1)[0] if len(accuracies) >= 20 else 0,
-            'total_tests': len(accuracies),
-            'predictions': predictions[-10:],  # 10 prediksi terakhir
-            'actuals': actuals[-10:]  # 10 aktual terakhir
+            'total_tests': len(accuracies)
         }
         
         return result
     
     @staticmethod
     def compare_methods(data, methods):
-        """
-        Membandingkan akurasi berbagai metode
-        """
+        """Membandingkan akurasi berbagai metode"""
         results = {}
         for name, func in methods.items():
             result = ModelValidator.backtest(data, func)
             if result:
                 results[name] = result
-        
         return results
-    
-    @staticmethod
-    def print_validation_report(data, methods):
-        """
-        Menampilkan laporan validasi
-        """
-        print("\n" + "="*60)
-        print("📊 LAPORAN VALIDASI AKURASI METODE")
-        print("="*60)
-        
-        results = ModelValidator.compare_methods(data, methods)
-        
-        # Urutkan berdasarkan mean accuracy
-        sorted_methods = sorted(results.items(), 
-                               key=lambda x: x[1]['mean_accuracy'], 
-                               reverse=True)
-        
-        for name, result in sorted_methods:
-            trend_symbol = "📈" if result['trend'] > 0 else "📉" if result['trend'] < 0 else "➡️"
-            print(f"\n{name}:")
-            print(f"  Mean Accuracy : {result['mean_accuracy']:.2%} ({trend_symbol})")
-            print(f"  Std Deviation : {result['std_accuracy']:.2%}")
-            print(f"  Last 10 Acc   : {result['last_10_accuracy']:.2%}")
-            print(f"  Total Tests   : {result['total_tests']}")
-            
-            # Tampilkan sample prediksi
-            if result['predictions']:
-                print("  Sample Prediksi (10 terakhir):")
-                for i, (pred, actual) in enumerate(zip(result['predictions'][-5:], 
-                                                       result['actuals'][-5:])):
-                    if isinstance(pred, list):
-                        pred_str = ' '.join(map(str, pred[:3])) + "..."
-                    else:
-                        pred_str = str(pred)
-                    print(f"    {i+1}. Pred: {pred_str} | Aktual: {actual}")
 
 
-# ========== FITUR 2: BOBOT ADAPTIF BERDASARKAN PERFORMANCE ==========
+# ========== BOBOT ADAPTIF ==========
 
 class AdaptiveWeightOptimizer:
     """
@@ -334,26 +278,16 @@ class AdaptiveWeightOptimizer:
         self.iteration = 0
         
     def update_weights(self, performances):
-        """
-        Update bobot berdasarkan performa terbaru
-        
-        Args:
-            performances: dict dengan performa setiap metode
-                         {'statistik': 0.6, 'ml_rf': 0.7, 'ml_lr': 0.65}
-        """
+        """Update bobot berdasarkan performa terbaru"""
         self.iteration += 1
-        
-        # Catat performa
         self.performance_history.append(performances)
         
-        # Hitung rata-rata performa terbaru (dengan memori decay)
         if len(self.performance_history) > 10:
-            # Weighted average: beri bobot lebih ke data terbaru
             total_weight = 0
             weighted_perf = {k: 0 for k in performances.keys()}
             
             for i, perf in enumerate(self.performance_history[-10:]):
-                time_weight = self.decay ** (9 - i)  # Data terbaru bobot lebih besar
+                time_weight = self.decay ** (9 - i)
                 total_weight += time_weight
                 for k, v in perf.items():
                     weighted_perf[k] += v * time_weight
@@ -361,20 +295,16 @@ class AdaptiveWeightOptimizer:
             for k in weighted_perf:
                 weighted_perf[k] /= total_weight
         else:
-            # Jika masih sedikit, pakai rata-rata biasa
             weighted_perf = performances
         
-        # Update bobot berdasarkan performa relatif
         total_perf = sum(weighted_perf.values())
         if total_perf > 0:
             new_weights = {}
             for k, v in weighted_perf.items():
-                # Bobot baru = (performa relatif) dengan smoothing
                 target_weight = v / total_perf
                 new_weights[k] = self.weights.get(k, 0) * (1 - self.learning_rate) + \
                                  target_weight * self.learning_rate
             
-            # Normalisasi
             total = sum(new_weights.values())
             for k in new_weights:
                 new_weights[k] /= total
@@ -384,28 +314,20 @@ class AdaptiveWeightOptimizer:
         return self.weights
     
     def get_weights(self):
-        """Mendapatkan bobot terkini"""
         return self.weights
     
     def get_ml_weight(self):
-        """Total bobot ML (RF + LR)"""
         return self.weights.get('ml_rf', 0) + self.weights.get('ml_lr', 0)
     
     def get_stat_weight(self):
-        """Bobot statistik"""
         return self.weights.get('statistik', 0.4)
 
 
-# ========== FITUR 3: ANTI-OVERFITTING ==========
+# ========== MACHINE LEARNING DENGAN ANTI-OVERFITTING ==========
 
 class RobustMLPredictor:
     """
-    ML Predictor dengan teknik anti-overfitting:
-    1. Cross Validation
-    2. Regularization
-    3. Early Stopping
-    4. Ensemble of models
-    5. Feature selection
+    ML Predictor dengan teknik anti-overfitting
     """
     
     def __init__(self):
@@ -415,13 +337,9 @@ class RobustMLPredictor:
         self.is_trained = False
         self.confidence = 0
         self.cv_scores = []
-        self.feature_importance = None
-        self.optimizer = AdaptiveWeightOptimizer()
         
     def extract_features(self, data, index):
-        """
-        Ekstrak 66 fitur dari data historis
-        """
+        """Ekstrak 66 fitur dari data historis"""
         features = []
         window = min(20, index)
         
@@ -501,13 +419,10 @@ class RobustMLPredictor:
         return features
     
     def train_with_cv(self, data):
-        """
-        Training dengan Cross Validation untuk mencegah overfitting
-        """
-        if len(data) < 40:  # Butuh data lebih untuk CV
+        """Training dengan Cross Validation untuk mencegah overfitting"""
+        if len(data) < 40:
             return False
         
-        # Siapkan data
         X = []
         y_digits = [[] for _ in range(4)]
         
@@ -524,79 +439,53 @@ class RobustMLPredictor:
             return False
         
         X = np.array(X)
-        
-        # Scale features
         X_scaled = self.scaler.fit_transform(X)
         
-        # Time Series Cross Validation
         tscv = TimeSeriesSplit(n_splits=5)
         
         self.models = []
         self.accuracies = []
         self.cv_scores = []
         
-        # Train untuk setiap posisi
         for pos in range(4):
             y = np.array(y_digits[pos])
-            
-            # Multiple models untuk ensemble
             pos_models = []
             pos_scores = []
             
-            # Model 1: Random Forest dengan Regularization
+            # Model 1: Random Forest
             rf_model = RandomForestClassifier(
-                n_estimators=50,  # Kurangi untuk cegah overfitting
-                max_depth=5,       # Batasi depth
-                min_samples_split=10,  # Minimal sample untuk split
-                min_samples_leaf=5,    # Minimal sample di leaf
-                max_features='sqrt',   # Random feature selection
-                random_state=42,
-                n_jobs=-1
+                n_estimators=50, max_depth=5, 
+                min_samples_split=10, min_samples_leaf=5,
+                max_features='sqrt', random_state=42, n_jobs=-1
             )
-            
-            # Cross validation score
             cv_scores_rf = cross_val_score(rf_model, X_scaled, y, cv=tscv, scoring='accuracy')
             mean_cv_rf = np.mean(cv_scores_rf)
-            
-            # Train dengan full data
             rf_model.fit(X_scaled, y)
             pos_models.append(('rf', rf_model))
             pos_scores.append(mean_cv_rf)
             
-            # Model 2: Logistic Regression dengan Regularization kuat
+            # Model 2: Logistic Regression
             lr_model = LogisticRegression(
-                C=0.1,  # Regularization kuat (nilai kecil = regularisasi kuat)
-                max_iter=1000,
-                random_state=42,
-                multi_class='ovr',
-                penalty='l2',  # L2 regularization
-                solver='lbfgs'
+                C=0.1, max_iter=1000, random_state=42,
+                multi_class='ovr', penalty='l2', solver='lbfgs'
             )
-            
             cv_scores_lr = cross_val_score(lr_model, X_scaled, y, cv=tscv, scoring='accuracy')
             mean_cv_lr = np.mean(cv_scores_lr)
-            
             lr_model.fit(X_scaled, y)
             pos_models.append(('lr', lr_model))
             pos_scores.append(mean_cv_lr)
             
-            # Model 3: Gradient Boosting (alternatif)
+            # Model 3: Gradient Boosting
             gb_model = GradientBoostingClassifier(
-                n_estimators=50,
-                max_depth=3,
-                learning_rate=0.1,
-                subsample=0.8,  # Gunakan subsample untuk cegah overfitting
-                random_state=42
+                n_estimators=50, max_depth=3, learning_rate=0.1,
+                subsample=0.8, random_state=42
             )
-            
             cv_scores_gb = cross_val_score(gb_model, X_scaled, y, cv=tscv, scoring='accuracy')
             mean_cv_gb = np.mean(cv_scores_gb)
-            
             gb_model.fit(X_scaled, y)
             pos_models.append(('gb', gb_model))
             pos_scores.append(mean_cv_gb)
             
-            # Pilih model terbaik berdasarkan CV score
             best_idx = np.argmax(pos_scores)
             best_model = pos_models[best_idx][1]
             best_score = pos_scores[best_idx]
@@ -614,9 +503,7 @@ class RobustMLPredictor:
         return True
     
     def predict_with_ensemble(self, data):
-        """
-        Prediksi dengan ensemble dan confidence score
-        """
+        """Prediksi dengan ensemble dan confidence score"""
         if not self.is_trained:
             return None
         
@@ -632,23 +519,17 @@ class RobustMLPredictor:
         all_probs = []
         
         for i, model in enumerate(self.models):
-            # Prediksi
             pred = model.predict(X_latest)[0]
             predictions.append(pred)
             
-            # Probabilitas dengan calibration
             if hasattr(model, 'predict_proba'):
                 proba = model.predict_proba(X_latest)[0]
-                
-                # Kalibrasi probabilitas (cegah overconfidence)
                 proba = np.clip(proba, 0.01, 0.99)
-                proba = proba / proba.sum()  # Normalisasi
-                
+                proba = proba / proba.sum()
                 prob = max(proba)
                 probabilities.append(prob)
                 all_probs.append(proba)
                 
-                # Urutkan digit berdasarkan probabilitas
                 digit_probs = [(j, proba[j]) for j in range(len(proba))]
                 digit_probs.sort(key=lambda x: x[1], reverse=True)
                 top_digits[i] = [d for d, p in digit_probs[:7]]
@@ -656,20 +537,16 @@ class RobustMLPredictor:
                 probabilities.append(0.5)
                 all_probs.append(np.array([0.1]*10))
         
-        # Ensemble probabilitas (rata-rata semua model)
         if all_probs:
             ensemble_proba = np.mean(all_probs, axis=0)
             self.confidence = np.max(ensemble_proba)
-        else:
-            self.confidence = 0.5
-        
-        # Hitung uncertainty (entropy) - rendah = yakin, tinggi = tidak yakin
-        if all_probs:
+            
             mean_proba = np.mean(all_probs, axis=0)
             entropy = -np.sum(mean_proba * np.log(mean_proba + 1e-10))
-            max_entropy = -np.log(1/10)  # Entropy maksimum untuk 10 kelas
+            max_entropy = -np.log(1/10)
             certainty = 1 - (entropy / max_entropy)
         else:
+            self.confidence = 0.5
             certainty = 0.5
         
         return {
@@ -679,9 +556,51 @@ class RobustMLPredictor:
             'certainty': certainty,
             'top_digits': top_digits,
             'accuracies': self.accuracies,
-            'cv_scores': self.cv_scores,
-            'ensemble_proba': ensemble_proba if all_probs else None
+            'cv_scores': self.cv_scores
         }
+    
+    # ===== FITUR BARU: PREDIKSI UNTUK KEPALA DAN EKOR =====
+    def predict_kepala_ekor(self, data):
+        """
+        Prediksi khusus untuk KEPALA (posisi 3) dan EKOR (posisi 4)
+        Menggunakan model ML yang sudah di-train
+        """
+        if not self.is_trained or len(self.models) < 4:
+            return None, None
+        
+        latest_features = self.extract_features(data, len(data)-1)
+        if not latest_features:
+            return None, None
+        
+        X_latest = self.scaler.transform([latest_features])
+        
+        # Model untuk KEPALA (index 2 = posisi puluhan)
+        if len(self.models) > 2:
+            model_kepala = self.models[2]
+            if hasattr(model_kepala, 'predict_proba'):
+                proba_kepala = model_kepala.predict_proba(X_latest)[0]
+                kepala_probs = [(j, proba_kepala[j]) for j in range(len(proba_kepala))]
+                kepala_probs.sort(key=lambda x: x[1], reverse=True)
+                kepala_ml = [d for d, p in kepala_probs[:7]]
+            else:
+                kepala_ml = []
+        else:
+            kepala_ml = []
+        
+        # Model untuk EKOR (index 3 = posisi satuan)
+        if len(self.models) > 3:
+            model_ekor = self.models[3]
+            if hasattr(model_ekor, 'predict_proba'):
+                proba_ekor = model_ekor.predict_proba(X_latest)[0]
+                ekor_probs = [(j, proba_ekor[j]) for j in range(len(proba_ekor))]
+                ekor_probs.sort(key=lambda x: x[1], reverse=True)
+                ekor_ml = [d for d, p in ekor_probs[:7]]
+            else:
+                ekor_ml = []
+        else:
+            ekor_ml = []
+        
+        return kepala_ml, ekor_ml
 
 
 # ========== ENSEMBLE DENGAN BOBOT ADAPTIF ==========
@@ -693,11 +612,9 @@ def ensemble_prediction_adaptive(data, ml_result, h6_stat, h3_stat, optimizer=No
     if not ml_result:
         return h6_stat, h3_stat, None
     
-    # Gunakan optimizer atau buat baru
     if optimizer is None:
         optimizer = AdaptiveWeightOptimizer()
     
-    # Dapatkan bobot terkini
     weights = optimizer.get_weights()
     ml_weight = weights.get('ml_rf', 0.3) + weights.get('ml_lr', 0.3)
     stat_weight = weights.get('statistik', 0.4)
@@ -705,13 +622,11 @@ def ensemble_prediction_adaptive(data, ml_result, h6_stat, h3_stat, optimizer=No
     # Ensemble untuk 6 ANGKA
     combined_scores = {}
     
-    # Skor dari ML
     for pos, top_digits in ml_result['top_digits'].items():
         for rank, digit in enumerate(top_digits[:6]):
             score = (6 - rank) * ml_weight * ml_result['certainty']
             combined_scores[digit] = combined_scores.get(digit, 0) + score
     
-    # Skor dari statistik
     for rank, digit in enumerate(h6_stat['h6']):
         score = (6 - rank) * stat_weight
         combined_scores[digit] = combined_scores.get(digit, 0) + score
@@ -765,27 +680,23 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
         'ekor': calc_ekor(data)
     }
     
-    # 2. Validasi akurasi (jika data cukup)
-    if len(data) >= 60 and verbose:
-        methods_to_validate = {
-            '6 ANGKA': calc6,
-            '3D TOP': calc3,
-            'KEPALA': calc_kepala,
-            'EKOR': calc_ekor
-        }
-        hasil['validasi'] = ModelValidator.compare_methods(data, methods_to_validate)
-    
-    # 3. Machine Learning dengan anti-overfitting
+    # 2. Machine Learning
     if use_ml and len(data) >= 40:
         ml_predictor = RobustMLPredictor()
         if ml_predictor.train_with_cv(data):
             ml_result = ml_predictor.predict_with_ensemble(data)
+            
+            # Dapatkan prediksi khusus untuk Kepala dan Ekor
+            kepala_ml, ekor_ml = ml_predictor.predict_kepala_ekor(data)
+            
             hasil['ml'] = {
                 'result': ml_result,
-                'predictor': ml_predictor
+                'predictor': ml_predictor,
+                'kepala_ml': kepala_ml,
+                'ekor_ml': ekor_ml
             }
             
-            # 4. Ensemble dengan bobot adaptif
+            # 3. Ensemble dengan bobot adaptif
             if optimizer is None:
                 optimizer = AdaptiveWeightOptimizer()
             
@@ -796,6 +707,45 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
                 optimizer
             )
             
+            # Ensemble untuk Kepala dan Ekor
+            kepala_stat = hasil['statistik']['kepala']
+            ekor_stat = hasil['statistik']['ekor']
+            
+            ml_weight_final = optimizer.get_ml_weight()
+            stat_weight_final = 1 - ml_weight_final
+            
+            # Ensemble Kepala
+            if kepala_ml:
+                kepala_combined = {}
+                for d in set(kepala_ml[:5] + kepala_stat[:5]):
+                    score = 0
+                    if d in kepala_ml[:5]:
+                        score += ml_weight_final * ml_result['certainty']
+                    if d in kepala_stat[:5]:
+                        score += stat_weight_final
+                    kepala_combined[d] = score
+                
+                sorted_kepala = sorted(kepala_combined.items(), key=lambda x: x[1], reverse=True)
+                kepala_final = [d for d, s in sorted_kepala[:7]]
+            else:
+                kepala_final = kepala_stat
+            
+            # Ensemble Ekor
+            if ekor_ml:
+                ekor_combined = {}
+                for d in set(ekor_ml[:5] + ekor_stat[:5]):
+                    score = 0
+                    if d in ekor_ml[:5]:
+                        score += ml_weight_final * ml_result['certainty']
+                    if d in ekor_stat[:5]:
+                        score += stat_weight_final
+                    ekor_combined[d] = score
+                
+                sorted_ekor = sorted(ekor_combined.items(), key=lambda x: x[1], reverse=True)
+                ekor_final = [d for d, s in sorted_ekor[:7]]
+            else:
+                ekor_final = ekor_stat
+            
             hasil['ensemble'] = {
                 'h6': h6_ensemble,
                 'h3': h3_ensemble,
@@ -803,36 +753,43 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
                 'stat_weight': optimizer.get_stat_weight(),
                 'confidence': ml_result['confidence'],
                 'certainty': ml_result['certainty'],
-                'weights': optimizer.get_weights()
+                'weights': optimizer.get_weights(),
+                'kepala_ml': kepala_ml,
+                'ekor_ml': ekor_ml
             }
             hasil['optimizer'] = optimizer
-    
-    # 5. Tentukan final berdasarkan ensemble atau statistik
-    if hasil['ensemble']:
-        h6_used = hasil['ensemble']['h6']['h6']
-        h3_used = hasil['ensemble']['h3']['h3']
-        metode = 'ensemble'
+            
+            # Update final dengan hasil ensemble Kepala/Ekor
+            hasil['final']['kepala'] = kepala_final
+            hasil['final']['ekor'] = ekor_final
+            hasil['final']['metode'] = 'ensemble'
+        else:
+            # ML gagal training
+            hasil['final']['kepala'] = hasil['statistik']['kepala']
+            hasil['final']['ekor'] = hasil['statistik']['ekor']
+            hasil['final']['metode'] = 'statistik'
     else:
-        h6_used = hasil['statistik']['h6']['h6']
-        h3_used = hasil['statistik']['h3']['h3']
-        metode = 'statistik'
+        # ML tidak digunakan
+        hasil['final']['kepala'] = hasil['statistik']['kepala']
+        hasil['final']['ekor'] = hasil['statistik']['ekor']
+        hasil['final']['metode'] = 'statistik'
     
-    hasil['final'] = {
-        'h6': h6_used,
-        'h3': h3_used,
-        'kepala': hasil['statistik']['kepala'],
-        'ekor': hasil['statistik']['ekor'],
-        'metode': metode
-    }
+    # Tentukan final untuk 6 ANGKA dan 3D
+    if hasil['ensemble']:
+        hasil['final']['h6'] = hasil['ensemble']['h6']['h6']
+        hasil['final']['h3'] = hasil['ensemble']['h3']['h3']
+    else:
+        hasil['final']['h6'] = hasil['statistik']['h6']['h6']
+        hasil['final']['h3'] = hasil['statistik']['h3']['h3']
     
     # Generate kombinasi
-    hasil['final']['c2'] = gen2d(h6_used)
-    hasil['final']['c3'] = gen3d(hasil['final']['c2'], h3_used)
+    hasil['final']['c2'] = gen2d(hasil['final']['h6'])
+    hasil['final']['c3'] = gen3d(hasil['final']['c2'], hasil['final']['h3'])
     
     # Generate Kepala*Ekor
     ke_combo = []
-    for k in hasil['statistik']['kepala']:
-        for e in hasil['statistik']['ekor']:
+    for k in hasil['final']['kepala']:
+        for e in hasil['final']['ekor']:
             ke_combo.append(f"{k}{e}")
     hasil['final']['ke_combo'] = ke_combo
     
@@ -841,7 +798,11 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
 
 # Untuk testing
 if __name__ == "__main__":
-    print("📦 Modul BrainX dengan 3 Fitur Baru:")
-    print("   ✅ Validasi Akurasi")
-    print("   ✅ Bobot Adaptif")
-    print("   ✅ Anti-Overfitting")
+    print("="*60)
+    print("📦 BRAINX MODULE - VERSI FINAL")
+    print("✅ Metode Statistik")
+    print("✅ Machine Learning (RF, LR, GB)")
+    print("✅ Anti-Overfitting")
+    print("✅ Bobot Adaptif")
+    print("✅ ML untuk Kepala & Ekor")
+    print("="*60)
