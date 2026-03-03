@@ -4,7 +4,7 @@
 🎯 PREDIKTOR 6 ANGKA - MAIN APPLICATION
 Versi Final dengan:
 ✅ Indikator ML tampil di layar
-✅ ML untuk 7 Kepala dan 7 Ekor
+✅ 8 Kepala dan 8 Ekor (peluang 80%)
 ✅ Bobot Adaptif
 ✅ Ensemble ML + Statistik
 ✅ Tanpa auto-check module (untuk Anaconda/PC)
@@ -144,8 +144,8 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
     lines.append(f"🔷 6 ANGKA: {'*'.join(map(str, hasil['final']['h6']))}")
     lines.append(f"🏆 3D TOP : {'*'.join(map(str, hasil['final']['h3']))}")
     lines.append("")
-    lines.append(f"🎯 7 KEPALA: {'*'.join(map(str, hasil['final']['kepala']))}")
-    lines.append(f"🎯 7 EKOR : {'*'.join(map(str, hasil['final']['ekor']))}")
+    lines.append(f"🎯 8 KEPALA: {'*'.join(map(str, hasil['final']['kepala']))}")
+    lines.append(f"🎯 8 EKOR : {'*'.join(map(str, hasil['final']['ekor']))}")
     lines.append("")
     
     # 2D
@@ -165,7 +165,7 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
         lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
         lines.append("*".join(hasil['final']['c3'][:200]) + ("..." if len(hasil['final']['c3']) > 200 else ""))
     
-    # Kepala*Ekor
+    # Kepala*Ekor (64 kombinasi)
     lines.append("")
     lines.append(f"💎 KEPALA*EKOR ({len(hasil['final']['ke_combo'])}):")
     lines.append("*".join(hasil['final']['ke_combo']))
@@ -177,7 +177,7 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
     
     return "\n".join(lines)
 
-# ========== FUNGSI TAMPILAN HASIL ML (DIPERBAIKI) ==========
+# ========== FUNGSI TAMPILAN HASIL ML ==========
 def tampilkan_hasil_ml(hasil):
     """Menampilkan detail hasil Machine Learning"""
     if not hasil['ml'] or not hasil['ml']['result']:
@@ -211,21 +211,21 @@ def tampilkan_hasil_ml(hasil):
         cprint(f"     {posisi}: {Colors.BOLD}{pred}{Colors.RESET} (prob: {prob:.2%})", Colors.WHITE)
         cprint(f"        Top 5: {' - '.join(map(str, top_digits))}", Colors.WHITE)
     
-    # Tampilkan prediksi ML untuk KEPALA dan EKOR
+    # Tampilkan prediksi ML untuk KEPALA dan EKOR (8 ANGKA)
     if 'kepala_ml' in hasil['ml'] and hasil['ml']['kepala_ml']:
         cprint(f"\n   🎯 PREDIKSI ML UNTUK KEPALA:", Colors.YELLOW)
-        cprint(f"        Top 7: {' - '.join(map(str, hasil['ml']['kepala_ml']))}", Colors.WHITE)
+        cprint(f"        Top 8: {' - '.join(map(str, hasil['ml']['kepala_ml']))}", Colors.WHITE)
     
     if 'ekor_ml' in hasil['ml'] and hasil['ml']['ekor_ml']:
         cprint(f"\n   🎯 PREDIKSI ML UNTUK EKOR:", Colors.YELLOW)
-        cprint(f"        Top 7: {' - '.join(map(str, hasil['ml']['ekor_ml']))}", Colors.WHITE)
+        cprint(f"        Top 8: {' - '.join(map(str, hasil['ml']['ekor_ml']))}", Colors.WHITE)
     
     # Tampilkan prediksi 4 digit lengkap
     prediksi_lengkap = ''.join(map(str, ml_result['predictions']))
     cprint(f"\n   🔢 PREDIKSI 4 DIGIT ML: {Colors.BOLD + Colors.YELLOW}{prediksi_lengkap}{Colors.RESET}", Colors.WHITE)
 
 
-# ========== FUNGSI TAMPILAN HASIL (DIPERBAIKI) ==========
+# ========== FUNGSI TAMPILAN HASIL ==========
 def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
     """Menampilkan hasil di layar dengan warna"""
     
@@ -284,14 +284,14 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
         ensemble_h6 = ' - '.join(map(str, hasil['ensemble']['h6']['h6']))
         cprint(f"   🔮 Ensemble  : {Colors.BOLD + Colors.GREEN}{ensemble_h6}{Colors.RESET}", Colors.WHITE)
     
-    # ===== KEPALA & EKOR dengan info ML =====
-    cprint(f"\n🎯 7 KEPALA: {Colors.BOLD + Colors.BLUE}{' - '.join(map(str, hasil['final']['kepala']))}{Colors.RESET}", Colors.WHITE)
+    # ===== 8 KEPALA & 8 EKOR dengan info ML =====
+    cprint(f"\n🎯 8 KEPALA: {Colors.BOLD + Colors.BLUE}{' - '.join(map(str, hasil['final']['kepala']))}{Colors.RESET}", Colors.WHITE)
     if hasil['ml'] and 'kepala_ml' in hasil['ml'] and hasil['ml']['kepala_ml']:
-        cprint(f"   🤖 ML rekomendasi: {' - '.join(map(str, hasil['ml']['kepala_ml'][:5]))} ...", Colors.WHITE)
+        cprint(f"   🤖 ML rekomendasi: {' - '.join(map(str, hasil['ml']['kepala_ml'][:6]))} ...", Colors.WHITE)
 
-    cprint(f"🎯 7 EKOR : {Colors.BOLD + Colors.RED}{' - '.join(map(str, hasil['final']['ekor']))}{Colors.RESET}", Colors.WHITE)
+    cprint(f"🎯 8 EKOR : {Colors.BOLD + Colors.RED}{' - '.join(map(str, hasil['final']['ekor']))}{Colors.RESET}", Colors.WHITE)
     if hasil['ml'] and 'ekor_ml' in hasil['ml'] and hasil['ml']['ekor_ml']:
-        cprint(f"   🤖 ML rekomendasi: {' - '.join(map(str, hasil['ml']['ekor_ml'][:5]))} ...", Colors.WHITE)
+        cprint(f"   🤖 ML rekomendasi: {' - '.join(map(str, hasil['ml']['ekor_ml'][:6]))} ...", Colors.WHITE)
     
     # ===== 2D =====
     c2 = hasil['final']['c2']
@@ -319,7 +319,7 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
         else:
             cprint("  " + " ".join(c3[:30]) + f" ... ({len(c3)-30} lainnya)", Colors.WHITE)
     
-    # ===== KEPALA*EKOR =====
+    # ===== KEPALA*EKOR (64 kombinasi) =====
     ke = hasil['final']['ke_combo']
     cprint(f"\n💎 KEPALA*EKOR ({Colors.YELLOW}{len(ke)}{Colors.RESET} kombinasi):", Colors.WHITE)
     if len(ke) <= 50:
