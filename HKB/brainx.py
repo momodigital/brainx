@@ -9,7 +9,7 @@ Versi Final dengan:
 ✅ ML untuk 8 Kepala dan 8 Ekor
 ✅ Ensemble ML + Statistik
 ✅ Feature Extraction 66 fitur
-✅ 3D IRISAN (3 digit) dari FILTER 2D + KEPALA*EKOR
+✅ 3D IRISAN 3 TAHAP (FILTER 2D + KEPALA*EKOR + 3D TOP)
 """
 
 import numpy as np
@@ -185,54 +185,56 @@ def gen3d(f2, top3):
     return sorted(res, key=int)
 
 
-# ========== FUNGSI 3D IRISAN (3 DIGIT) ==========
+# ========== FUNGSI 3D IRISAN 3 TAHAP ==========
 
-def gen3d_dari_irisan(filter_2d, kepala_ekor, top3):
+def gen_semua_3d_dari_top3(top3_digits):
     """
-    Generate 3D COMBO (3 DIGIT) berdasarkan irisan dari:
-    - filter_2d: hasil filter 2D (sudah dipilih user)
-    - kepala_ekor: kombinasi kepala*ekor (2 digit)
-    
-    Rumus yang benar (3 DIGIT):
-    1. KEPALA + 2D FILTER  -> 1 digit + 2 digit = 3 digit
-    2. 2D FILTER + EKOR     -> 2 digit + 1 digit = 3 digit
-    
-    Dimana:
-    - kepala adalah digit pertama dari kombinasi kepala*ekor
-    - ekor adalah digit kedua dari kombinasi kepala*ekor
-    - 2D filter adalah angka 2 digit dari hasil filter user
+    TAHAP 2: Generate semua angka 000-999 yang mengandung setidaknya SATU digit dari top3
+    Contoh: top3 = [6,1,4] → generate semua angka yang mengandung 6 atau 1 atau 4
     """
-    if not filter_2d or not kepala_ekor:
+    if not top3_digits:
         return []
     
-    # Ekstrak semua digit kepala dan ekor yang valid (sebagai string)
-    kepala_set = set()
-    ekor_set = set()
-    for ke in kepala_ekor:
-        if len(ke) == 2:
-            kepala_set.add(ke[0])
-            ekor_set.add(ke[1])
+    # Konversi ke string untuk pengecekan
+    top3_set = set(str(d) for d in top3_digits)
+    hasil = []
     
-    hasil = set()
+    for i in range(1000):
+        angka = f"{i:03d}"
+        if any(d in top3_set for d in angka):
+            hasil.append(angka)
     
-    # Format 1: KEPALA + 2D FILTER (1 digit + 2 digit = 3 digit)
-    for k in kepala_set:
-        for dua_d in filter_2d:
-            if len(dua_d) == 2:
-                angka3d = f"{k}{dua_d}"
-                if len(angka3d) == 3 and angka3d.isdigit():
-                    hasil.add(angka3d)
+    return hasil
+
+
+def gen_3d_irisan_final(irisan_2d, top3_digits):
+    """
+    TAHAP 3: Generate 3D IRISAN FINAL berdasarkan:
+    - irisan_2d: hasil irisan antara FILTER 2D dan KEPALA*EKOR (list 2D)
+    - top3_digits: 3 digit top (misal: [6,1,4])
     
-    # Format 2: 2D FILTER + EKOR (2 digit + 1 digit = 3 digit)
-    for dua_d in filter_2d:
-        if len(dua_d) == 2:
-            for e in ekor_set:
-                angka3d = f"{dua_d}{e}"
-                if len(angka3d) == 3 and angka3d.isdigit():
-                    hasil.add(angka3d)
+    Logika:
+    - Generate semua angka 000-999 yang mengandung setidaknya SATU digit dari top3 (TAHAP 2)
+    - Dari angka-angka tersebut, ambil yang 2 digit terakhirnya (2D belakang)
+      ada di dalam irisan_2d (TAHAP 1)
+    """
+    if not irisan_2d or not top3_digits:
+        return []
     
-    # Urutkan hasil secara numerik
-    return sorted(list(hasil), key=int)
+    # TAHAP 2: Generate semua 3D dari top3
+    semua_3d = gen_semua_3d_dari_top3(top3_digits)
+    
+    # Konversi irisan_2d ke set untuk pengecekan cepat
+    irisan_set = set(irisan_2d)
+    
+    # TAHAP 3: Filter berdasarkan 2D belakang
+    hasil = []
+    for angka in semua_3d:
+        dua_d_belakang = angka[1:3]  # Ambil 2 digit terakhir
+        if dua_d_belakang in irisan_set:
+            hasil.append(angka)
+    
+    return hasil
 
 
 # ========== VALIDASI AKURASI ==========
@@ -711,10 +713,12 @@ def ensemble_prediction_adaptive(data, ml_result, h6_stat, h3_stat, optimizer=No
 
 # ========== FUNGSI UTAMA YANG DIPANGGIL ==========
 
-def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False, filter_2d_list=None):
+def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False, 
+                 filter_2d_list=None, irisan_2d=None):
     """
     Fungsi utama yang memanggil semua metode dengan fitur lengkap
-    filter_2d_list: hasil filter 2D dari user (opsional, untuk 3D irisan)
+    filter_2d_list: hasil filter 2D dari user (opsional)
+    irisan_2d: hasil irisan antara FILTER 2D dan KEPALA*EKOR (opsional, untuk 3D final)
     """
     hasil = {
         'statistik': {},
@@ -846,15 +850,14 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
             ke_combo.append(f"{k}{e}")
     hasil['final']['ke_combo'] = ke_combo
     
-    # Generate 3D IRISAN (3 DIGIT) jika filter_2d_list diberikan
-    if filter_2d_list and len(filter_2d_list) > 0:
-        hasil['final']['c3_irisan'] = gen3d_dari_irisan(
-            filter_2d_list, 
-            hasil['final']['ke_combo'], 
-            hasil['final']['h3']
+    # Generate 3D IRISAN FINAL (3 TAHAP) jika irisan_2d diberikan
+    if irisan_2d and len(irisan_2d) > 0:
+        hasil['final']['c3_irisan_final'] = gen_3d_irisan_final(
+            irisan_2d,
+            hasil['final']['h3']  # top3 digits
         )
     else:
-        hasil['final']['c3_irisan'] = []
+        hasil['final']['c3_irisan_final'] = []
     
     return hasil
 
@@ -868,5 +871,5 @@ if __name__ == "__main__":
     print("✅ Anti-Overfitting")
     print("✅ Bobot Adaptif")
     print("✅ 8 KEPALA & 8 EKOR")
-    print("✅ 3D IRISAN (3 digit) dari FILTER 2D + KEPALA*EKOR")
+    print("✅ 3D IRISAN 3 TAHAP (FILTER 2D + KEPALA*EKOR + 3D TOP)")
     print("="*60)
