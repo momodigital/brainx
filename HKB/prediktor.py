@@ -7,6 +7,7 @@ Versi Final dengan:
 ✅ 8 Kepala dan 8 Ekor (peluang 80%)
 ✅ Bobot Adaptif
 ✅ Ensemble ML + Statistik
+✅ 3D IRISAN dari FILTER 2D + KEPALA*EKOR
 ✅ Tanpa auto-check module (untuk Anaconda/PC)
 """
 
@@ -159,11 +160,17 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
         if f_c2:
             lines.append("*".join(f_c2))
     
-    # 3D Combo
+    # 3D Combo Standar
     if hasil['final']['c3']:
         lines.append("")
         lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
         lines.append("*".join(hasil['final']['c3']))
+    
+    # 3D Combo Irisan (FILTER 2D + KEPALA*EKOR)
+    if hasil['final'].get('c3_irisan') and len(hasil['final']['c3_irisan']) > 0:
+        lines.append("")
+        lines.append(f"🎯 3D IRISAN (FILTER 2D + KEPALA*EKOR) ({len(hasil['final']['c3_irisan'])}):")
+        lines.append("*".join(hasil['final']['c3_irisan']))
     
     # Kepala*Ekor
     lines.append("")
@@ -175,7 +182,7 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
     lines.append("="*50)
     lines.append("Gunakan dengan bijak. Good luck! 🍀")
     
-    return "\n".join(lines)  # ← INI HARUS ADA DI DALAM FUNGSI
+    return "\n".join(lines)
 
 # ========== FUNGSI TAMPILAN HASIL ML ==========
 def tampilkan_hasil_ml(hasil):
@@ -309,7 +316,7 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
             else:
                 cprint("  " + " ".join(f_c2[:30]) + f" ... ({len(f_c2)-30} lainnya)", Colors.WHITE)
     
-    # ===== 3D COMBO =====
+    # ===== 3D COMBO STANDAR =====
     if hasil['final']['c3']:
         c3 = hasil['final']['c3']
         cprint(f"\n🎲 3D COMBO ({Colors.MAGENTA}{len(c3)}{Colors.RESET} kombinasi):", Colors.WHITE)
@@ -317,6 +324,15 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
             cprint("  " + " ".join(c3), Colors.WHITE)
         else:
             cprint("  " + " ".join(c3[:50]) + f" ... ({len(c3)-50} lainnya)", Colors.WHITE)
+    
+    # ===== 3D COMBO IRISAN (FILTER 2D + KEPALA*EKOR) =====
+    if hasil['final'].get('c3_irisan') and len(hasil['final']['c3_irisan']) > 0:
+        c3_irisan = hasil['final']['c3_irisan']
+        cprint(f"\n🎯 3D IRISAN (FILTER 2D + KEPALA*EKOR) ({Colors.MAGENTA}{len(c3_irisan)}{Colors.RESET} kombinasi):", Colors.WHITE)
+        if len(c3_irisan) <= 50:
+            cprint("  " + " ".join(c3_irisan), Colors.WHITE)
+        else:
+            cprint("  " + " ".join(c3_irisan[:50]) + f" ... ({len(c3_irisan)-50} lainnya)", Colors.WHITE)
     
     # ===== KEPALA*EKOR =====
     ke = hasil['final']['ke_combo']
@@ -448,24 +464,32 @@ def main():
             cprint(f"✅ Data: {len(data)} putaran. Memproses...", Colors.GREEN)
             time.sleep(1)
             
-            # Hitung semua metode
-            cprint("\n📊 Menjalankan semua metode prediksi...", Colors.CYAN)
-            
+            # Hitung semua metode (tanpa filter dulu)
             use_ml = ml_mode != 'off'
             if ml_mode == 'adaptive':
-                # Mode adaptif: gunakan optimizer dari iterasi sebelumnya
                 hasil = hitung_semua(data, use_ml=use_ml, ml_weight=ml_weight, 
                                     optimizer=optimizer, verbose=True)
                 if hasil['optimizer']:
                     optimizer = hasil['optimizer']
             else:
-                # Mode manual: bobot tetap
                 hasil = hitung_semua(data, use_ml=use_ml, ml_weight=ml_weight, 
                                     verbose=True)
             
             # Filter
             filt = input(Colors.YELLOW + "\n🔧 Filter digit (contoh: 159) / Enter skip: " + Colors.RESET).strip()
             f_c2 = filter_2d(hasil['final']['c2'], filt) if filt else hasil['final']['c2']
+            
+            # Hitung ulang dengan filter untuk mendapatkan 3D irisan
+            if filt:
+                if ml_mode == 'adaptive':
+                    hasil = hitung_semua(data, use_ml=use_ml, ml_weight=ml_weight, 
+                                        optimizer=optimizer, verbose=True, 
+                                        filter_2d_list=f_c2)
+                    if hasil['optimizer']:
+                        optimizer = hasil['optimizer']
+                else:
+                    hasil = hitung_semua(data, use_ml=use_ml, ml_weight=ml_weight, 
+                                        verbose=True, filter_2d_list=f_c2)
             
             # Tampilkan hasil
             tampilkan_hasil(m_name, len(data), hasil, filt, f_c2)
