@@ -159,13 +159,13 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
         if f_c2:
             lines.append("*".join(f_c2))
     
-# 3D Combo - Tampilkan SEMUA di file
-if hasil['final']['c3']:
-    lines.append("")
-    lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
-    lines.append("*".join(hasil['final']['c3']))  # ← HAPUS [:200]
+    # 3D Combo
+    if hasil['final']['c3']:
+        lines.append("")
+        lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
+        lines.append("*".join(hasil['final']['c3']))
     
-    # Kepala*Ekor (64 kombinasi)
+    # Kepala*Ekor
     lines.append("")
     lines.append(f"💎 KEPALA*EKOR ({len(hasil['final']['ke_combo'])}):")
     lines.append("*".join(hasil['final']['ke_combo']))
@@ -175,7 +175,7 @@ if hasil['final']['c3']:
     lines.append("="*50)
     lines.append("Gunakan dengan bijak. Good luck! 🍀")
     
-    return "\n".join(lines)
+    return "\n".join(lines)  # ← INI HARUS ADA DI DALAM FUNGSI
 
 # ========== FUNGSI TAMPILAN HASIL ML ==========
 def tampilkan_hasil_ml(hasil):
@@ -211,7 +211,7 @@ def tampilkan_hasil_ml(hasil):
         cprint(f"     {posisi}: {Colors.BOLD}{pred}{Colors.RESET} (prob: {prob:.2%})", Colors.WHITE)
         cprint(f"        Top 5: {' - '.join(map(str, top_digits))}", Colors.WHITE)
     
-    # Tampilkan prediksi ML untuk KEPALA dan EKOR (8 ANGKA)
+    # Tampilkan prediksi ML untuk KEPALA dan EKOR
     if 'kepala_ml' in hasil['ml'] and hasil['ml']['kepala_ml']:
         cprint(f"\n   🎯 PREDIKSI ML UNTUK KEPALA:", Colors.YELLOW)
         cprint(f"        Top 8: {' - '.join(map(str, hasil['ml']['kepala_ml']))}", Colors.WHITE)
@@ -223,7 +223,6 @@ def tampilkan_hasil_ml(hasil):
     # Tampilkan prediksi 4 digit lengkap
     prediksi_lengkap = ''.join(map(str, ml_result['predictions']))
     cprint(f"\n   🔢 PREDIKSI 4 DIGIT ML: {Colors.BOLD + Colors.YELLOW}{prediksi_lengkap}{Colors.RESET}", Colors.WHITE)
-
 
 # ========== FUNGSI TAMPILAN HASIL ==========
 def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
@@ -310,16 +309,16 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
             else:
                 cprint("  " + " ".join(f_c2[:30]) + f" ... ({len(f_c2)-30} lainnya)", Colors.WHITE)
     
-# ===== 3D COMBO =====
-if hasil['final']['c3']:
-    c3 = hasil['final']['c3']
-    cprint(f"\n🎲 3D COMBO ({Colors.MAGENTA}{len(c3)}{Colors.RESET} kombinasi):", Colors.WHITE)
-    if len(c3) <= 50:  # Tetap batasi tampilan layar agar tidak kepanjangan
-        cprint("  " + " ".join(c3), Colors.WHITE)
-    else:
-        cprint("  " + " ".join(c3[:50]) + f" ... ({len(c3)-50} lainnya)", Colors.WHITE)  # Tampilkan 50 di layar
+    # ===== 3D COMBO =====
+    if hasil['final']['c3']:
+        c3 = hasil['final']['c3']
+        cprint(f"\n🎲 3D COMBO ({Colors.MAGENTA}{len(c3)}{Colors.RESET} kombinasi):", Colors.WHITE)
+        if len(c3) <= 50:
+            cprint("  " + " ".join(c3), Colors.WHITE)
+        else:
+            cprint("  " + " ".join(c3[:50]) + f" ... ({len(c3)-50} lainnya)", Colors.WHITE)
     
-    # ===== KEPALA*EKOR (64 kombinasi) =====
+    # ===== KEPALA*EKOR =====
     ke = hasil['final']['ke_combo']
     cprint(f"\n💎 KEPALA*EKOR ({Colors.YELLOW}{len(ke)}{Colors.RESET} kombinasi):", Colors.WHITE)
     if len(ke) <= 50:
@@ -330,7 +329,6 @@ if hasil['final']['c3']:
     # ===== TAMPILKAN DETAIL ML =====
     if hasil['ml'] and hasil['ml']['result']:
         tampilkan_hasil_ml(hasil)
-
 
 # ========== FUNGSI MENU KONFIGURASI ==========
 def menu_konfigurasi():
