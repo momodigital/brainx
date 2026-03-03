@@ -7,7 +7,7 @@ Versi Final dengan:
 ✅ 8 Kepala dan 8 Ekor (peluang 80%)
 ✅ Bobot Adaptif
 ✅ Ensemble ML + Statistik
-✅ 3D IRISAN dari FILTER 2D + KEPALA*EKOR
+✅ 3D IRISAN 3 TAHAP (FILTER 2D + KEPALA*EKOR + 3D TOP)
 ✅ Tanpa auto-check module (untuk Anaconda/PC)
 """
 
@@ -118,7 +118,7 @@ def filter_2d(c2, filter_digits):
     return [x for x in c2 if any(int(c) in digits for c in x)]
 
 # ========== FUNGSI FORMAT OUTPUT UNTUK FILE ==========
-def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
+def format_file_output(m_name, data_len, hasil, filter_digits, f_c2, irisan_2d=None):
     """Membuat string output untuk file dengan pemisah *"""
     lines = []
     
@@ -160,17 +160,23 @@ def format_file_output(m_name, data_len, hasil, filter_digits, f_c2):
         if f_c2:
             lines.append("*".join(f_c2))
     
+    # Irisan 2D (FILTER + KEPALA*EKOR)
+    if irisan_2d and len(irisan_2d) > 0:
+        lines.append("")
+        lines.append(f"🔗 IRISAN 2D (FILTER + KEPALA*EKOR) ({len(irisan_2d)}):")
+        lines.append("*".join(irisan_2d))
+    
     # 3D Combo Standar
     if hasil['final']['c3']:
         lines.append("")
         lines.append(f"🎲 3D COMBO ({len(hasil['final']['c3'])}):")
         lines.append("*".join(hasil['final']['c3']))
     
-    # 3D Combo Irisan (FILTER 2D + KEPALA*EKOR)
-    if hasil['final'].get('c3_irisan') and len(hasil['final']['c3_irisan']) > 0:
+    # 3D Irisan Final
+    if hasil['final'].get('c3_irisan_final') and len(hasil['final']['c3_irisan_final']) > 0:
         lines.append("")
-        lines.append(f"🎯 3D IRISAN (FILTER 2D + KEPALA*EKOR) ({len(hasil['final']['c3_irisan'])}):")
-        lines.append("*".join(hasil['final']['c3_irisan']))
+        lines.append(f"🎯 3D IRISAN FINAL (FILTER + KEPALA*EKOR + 3D TOP) ({len(hasil['final']['c3_irisan_final'])}):")
+        lines.append("*".join(hasil['final']['c3_irisan_final']))
     
     # Kepala*Ekor
     lines.append("")
@@ -232,7 +238,7 @@ def tampilkan_hasil_ml(hasil):
     cprint(f"\n   🔢 PREDIKSI 4 DIGIT ML: {Colors.BOLD + Colors.YELLOW}{prediksi_lengkap}{Colors.RESET}", Colors.WHITE)
 
 # ========== FUNGSI TAMPILAN HASIL ==========
-def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
+def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None, irisan_2d=None):
     """Menampilkan hasil di layar dengan warna"""
     
     cprint("\n" + "="*50, Colors.CYAN)
@@ -316,6 +322,14 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
             else:
                 cprint("  " + " ".join(f_c2[:30]) + f" ... ({len(f_c2)-30} lainnya)", Colors.WHITE)
     
+    # ===== IRISAN 2D (FILTER + KEPALA*EKOR) =====
+    if irisan_2d and len(irisan_2d) > 0:
+        cprint(f"\n🔗 IRISAN 2D (FILTER + KEPALA*EKOR) ({Colors.CYAN}{len(irisan_2d)}{Colors.RESET} line 2D):", Colors.WHITE)
+        if len(irisan_2d) <= 30:
+            cprint("  " + " ".join(irisan_2d), Colors.WHITE)
+        else:
+            cprint("  " + " ".join(irisan_2d[:30]) + f" ... ({len(irisan_2d)-30} lainnya)", Colors.WHITE)
+    
     # ===== 3D COMBO STANDAR =====
     if hasil['final']['c3']:
         c3 = hasil['final']['c3']
@@ -325,14 +339,14 @@ def tampilkan_hasil(m_name, data_len, hasil, filter_digits="", f_c2=None):
         else:
             cprint("  " + " ".join(c3[:50]) + f" ... ({len(c3)-50} lainnya)", Colors.WHITE)
     
-    # ===== 3D COMBO IRISAN (FILTER 2D + KEPALA*EKOR) =====
-    if hasil['final'].get('c3_irisan') and len(hasil['final']['c3_irisan']) > 0:
-        c3_irisan = hasil['final']['c3_irisan']
-        cprint(f"\n🎯 3D IRISAN (FILTER 2D + KEPALA*EKOR) ({Colors.MAGENTA}{len(c3_irisan)}{Colors.RESET} kombinasi):", Colors.WHITE)
-        if len(c3_irisan) <= 50:
-            cprint("  " + " ".join(c3_irisan), Colors.WHITE)
+    # ===== 3D IRISAN FINAL =====
+    if hasil['final'].get('c3_irisan_final') and len(hasil['final']['c3_irisan_final']) > 0:
+        c3_final = hasil['final']['c3_irisan_final']
+        cprint(f"\n🎯 3D IRISAN FINAL (FILTER + KEPALA*EKOR + 3D TOP) ({Colors.MAGENTA}{len(c3_final)}{Colors.RESET} kombinasi):", Colors.WHITE)
+        if len(c3_final) <= 50:
+            cprint("  " + " ".join(c3_final), Colors.WHITE)
         else:
-            cprint("  " + " ".join(c3_irisan[:50]) + f" ... ({len(c3_irisan)-50} lainnya)", Colors.WHITE)
+            cprint("  " + " ".join(c3_final[:50]) + f" ... ({len(c3_final)-50} lainnya)", Colors.WHITE)
     
     # ===== KEPALA*EKOR =====
     ke = hasil['final']['ke_combo']
@@ -479,20 +493,29 @@ def main():
             filt = input(Colors.YELLOW + "\n🔧 Filter digit (contoh: 159) / Enter skip: " + Colors.RESET).strip()
             f_c2 = filter_2d(hasil['final']['c2'], filt) if filt else hasil['final']['c2']
             
-            # Hitung ulang dengan filter untuk mendapatkan 3D irisan
-            if filt:
+            # Hitung irisan 2D (FILTER + KEPALA*EKOR)
+            irisan_2d = []
+            if filt and len(f_c2) > 0:
+                ke_set = set(hasil['final']['ke_combo'])
+                filter_set = set(f_c2)
+                irisan_2d = sorted(list(ke_set.intersection(filter_set)))
+            
+            # Hitung ulang dengan filter untuk mendapatkan 3D irisan final
+            if filt and len(irisan_2d) > 0:
                 if ml_mode == 'adaptive':
                     hasil = hitung_semua(data, use_ml=use_ml, ml_weight=ml_weight, 
                                         optimizer=optimizer, verbose=True, 
-                                        filter_2d_list=f_c2)
+                                        filter_2d_list=f_c2,
+                                        irisan_2d=irisan_2d)
                     if hasil['optimizer']:
                         optimizer = hasil['optimizer']
                 else:
                     hasil = hitung_semua(data, use_ml=use_ml, ml_weight=ml_weight, 
-                                        verbose=True, filter_2d_list=f_c2)
+                                        verbose=True, filter_2d_list=f_c2,
+                                        irisan_2d=irisan_2d)
             
             # Tampilkan hasil
-            tampilkan_hasil(m_name, len(data), hasil, filt, f_c2)
+            tampilkan_hasil(m_name, len(data), hasil, filt, f_c2, irisan_2d)
             
             # Simpan file
             save = input(Colors.GREEN + "\n💾 Simpan ke file? (y/n): " + Colors.RESET).lower()
@@ -502,7 +525,7 @@ def main():
                 fname = f"prediktor_{mode}_{choice}_{datetime.now().strftime('%H%M%S')}.txt"
                 
                 # Buat konten file
-                file_content = format_file_output(m_name, len(data), hasil, filt, f_c2)
+                file_content = format_file_output(m_name, len(data), hasil, filt, f_c2, irisan_2d)
                 
                 try:
                     with open(fname, 'w', encoding='utf-8') as f:
