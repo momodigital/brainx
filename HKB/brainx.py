@@ -6,7 +6,7 @@ Versi Final dengan:
 ✅ Machine Learning (RF, LR, GB)
 ✅ Anti-Overfitting (Cross Validation, Regularization)
 ✅ Bobot Adaptif berdasarkan Performa
-✅ ML untuk 7 Kepala dan 7 Ekor
+✅ ML untuk 8 Kepala dan 8 Ekor
 ✅ Ensemble ML + Statistik
 ✅ Feature Extraction 66 fitur
 """
@@ -111,6 +111,7 @@ def calc3(data):
 def calc_kepala(data):
     """
     Metode KEPALA - Fokus pada posisi puluhan
+    MENJADI 8 ANGKA
     """
     if len(data) < 15:
         return []
@@ -127,12 +128,13 @@ def calc_kepala(data):
         scores[digit] = round(sc, 2)
     
     sorted_s = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    return [d for d, s in sorted_s[:7]]
+    return [d for d, s in sorted_s[:8]]  # 8 KEPALA
 
 
 def calc_ekor(data):
     """
     Metode EKOR - Fokus pada posisi satuan
+    MENJADI 8 ANGKA
     """
     if len(data) < 15:
         return []
@@ -149,7 +151,7 @@ def calc_ekor(data):
         scores[digit] = round(sc, 2)
     
     sorted_s = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    return [d for d, s in sorted_s[:7]]
+    return [d for d, s in sorted_s[:8]]  # 8 EKOR
 
 
 def gen2d(top6):
@@ -172,7 +174,7 @@ def gen3d(f2, top3):
         return []
     
     res, seen = [], set()
-    for s in f2:
+    for s in f2[:100]:  # Batasi untuk performa
         a, b = int(s[0]), int(s[1])
         for x in top3:
             for p in [f"{a}{b}{x}", f"{a}{x}{b}", f"{b}{a}{x}", f"{b}{x}{a}", f"{x}{a}{b}", f"{x}{b}{a}"]:
@@ -559,11 +561,10 @@ class RobustMLPredictor:
             'cv_scores': self.cv_scores
         }
     
-    # ===== FITUR BARU: PREDIKSI UNTUK KEPALA DAN EKOR =====
     def predict_kepala_ekor(self, data):
         """
         Prediksi khusus untuk KEPALA (posisi 3) dan EKOR (posisi 4)
-        Menggunakan model ML yang sudah di-train
+        MENJADI 8 ANGKA
         """
         if not self.is_trained or len(self.models) < 4:
             return None, None
@@ -581,7 +582,7 @@ class RobustMLPredictor:
                 proba_kepala = model_kepala.predict_proba(X_latest)[0]
                 kepala_probs = [(j, proba_kepala[j]) for j in range(len(proba_kepala))]
                 kepala_probs.sort(key=lambda x: x[1], reverse=True)
-                kepala_ml = [d for d, p in kepala_probs[:7]]
+                kepala_ml = [d for d, p in kepala_probs[:8]]  # 8 KEPALA
             else:
                 kepala_ml = []
         else:
@@ -594,7 +595,7 @@ class RobustMLPredictor:
                 proba_ekor = model_ekor.predict_proba(X_latest)[0]
                 ekor_probs = [(j, proba_ekor[j]) for j in range(len(proba_ekor))]
                 ekor_probs.sort(key=lambda x: x[1], reverse=True)
-                ekor_ml = [d for d, p in ekor_probs[:7]]
+                ekor_ml = [d for d, p in ekor_probs[:8]]  # 8 EKOR
             else:
                 ekor_ml = []
         else:
@@ -714,37 +715,37 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
             ml_weight_final = optimizer.get_ml_weight()
             stat_weight_final = 1 - ml_weight_final
             
-            # Ensemble Kepala
+            # Ensemble Kepala (menjadi 8)
             if kepala_ml:
                 kepala_combined = {}
-                for d in set(kepala_ml[:5] + kepala_stat[:5]):
+                for d in set(kepala_ml[:6] + kepala_stat[:6]):  # Top 6 dari masing-masing
                     score = 0
-                    if d in kepala_ml[:5]:
+                    if d in kepala_ml[:6]:
                         score += ml_weight_final * ml_result['certainty']
-                    if d in kepala_stat[:5]:
+                    if d in kepala_stat[:6]:
                         score += stat_weight_final
                     kepala_combined[d] = score
                 
                 sorted_kepala = sorted(kepala_combined.items(), key=lambda x: x[1], reverse=True)
-                kepala_final = [d for d, s in sorted_kepala[:7]]
+                kepala_final = [d for d, s in sorted_kepala[:8]]  # 8 KEPALA
             else:
-                kepala_final = kepala_stat
+                kepala_final = kepala_stat[:8]  # 8 KEPALA
             
-            # Ensemble Ekor
+            # Ensemble Ekor (menjadi 8)
             if ekor_ml:
                 ekor_combined = {}
-                for d in set(ekor_ml[:5] + ekor_stat[:5]):
+                for d in set(ekor_ml[:6] + ekor_stat[:6]):  # Top 6 dari masing-masing
                     score = 0
-                    if d in ekor_ml[:5]:
+                    if d in ekor_ml[:6]:
                         score += ml_weight_final * ml_result['certainty']
-                    if d in ekor_stat[:5]:
+                    if d in ekor_stat[:6]:
                         score += stat_weight_final
                     ekor_combined[d] = score
                 
                 sorted_ekor = sorted(ekor_combined.items(), key=lambda x: x[1], reverse=True)
-                ekor_final = [d for d, s in sorted_ekor[:7]]
+                ekor_final = [d for d, s in sorted_ekor[:8]]  # 8 EKOR
             else:
-                ekor_final = ekor_stat
+                ekor_final = ekor_stat[:8]  # 8 EKOR
             
             hasil['ensemble'] = {
                 'h6': h6_ensemble,
@@ -765,13 +766,13 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
             hasil['final']['metode'] = 'ensemble'
         else:
             # ML gagal training
-            hasil['final']['kepala'] = hasil['statistik']['kepala']
-            hasil['final']['ekor'] = hasil['statistik']['ekor']
+            hasil['final']['kepala'] = hasil['statistik']['kepala'][:8]  # 8 KEPALA
+            hasil['final']['ekor'] = hasil['statistik']['ekor'][:8]      # 8 EKOR
             hasil['final']['metode'] = 'statistik'
     else:
         # ML tidak digunakan
-        hasil['final']['kepala'] = hasil['statistik']['kepala']
-        hasil['final']['ekor'] = hasil['statistik']['ekor']
+        hasil['final']['kepala'] = hasil['statistik']['kepala'][:8]  # 8 KEPALA
+        hasil['final']['ekor'] = hasil['statistik']['ekor'][:8]      # 8 EKOR
         hasil['final']['metode'] = 'statistik'
     
     # Tentukan final untuk 6 ANGKA dan 3D
@@ -786,7 +787,7 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
     hasil['final']['c2'] = gen2d(hasil['final']['h6'])
     hasil['final']['c3'] = gen3d(hasil['final']['c2'], hasil['final']['h3'])
     
-    # Generate Kepala*Ekor
+    # Generate Kepala*Ekor (8x8 = 64 kombinasi)
     ke_combo = []
     for k in hasil['final']['kepala']:
         for e in hasil['final']['ekor']:
@@ -804,5 +805,5 @@ if __name__ == "__main__":
     print("✅ Machine Learning (RF, LR, GB)")
     print("✅ Anti-Overfitting")
     print("✅ Bobot Adaptif")
-    print("✅ ML untuk Kepala & Ekor")
+    print("✅ 8 KEPALA & 8 EKOR (peluang 80%)")
     print("="*60)
