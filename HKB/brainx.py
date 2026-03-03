@@ -9,6 +9,7 @@ Versi Final dengan:
 ✅ ML untuk 8 Kepala dan 8 Ekor
 ✅ Ensemble ML + Statistik
 ✅ Feature Extraction 66 fitur
+✅ 3D IRISAN dari FILTER 2D + KEPALA*EKOR
 """
 
 import numpy as np
@@ -165,24 +166,81 @@ def gen2d(top6):
             result.append(s)
     return result
 
+
 def gen3d(f2, top3):
     """
     Generate 3D combo dari 2D dan top 3
-    TANPA BATASAN - TAMPILKAN SEMUA
     """
     if not f2 or not top3:
         return []
     
     res, seen = [], set()
-    for s in f2:  # ← HAPUS [:100], ambil semua 2D
+    for s in f2:
         a, b = int(s[0]), int(s[1])
         for x in top3:
-            for p in [f"{a}{b}{x}", f"{a}{x}{b}", f"{b}{a}{x}", 
-                     f"{b}{x}{a}", f"{x}{a}{b}", f"{x}{b}{a}"]:
+            for p in [f"{a}{b}{x}", f"{a}{x}{b}", f"{b}{a}{x}", f"{b}{x}{a}", f"{x}{a}{b}", f"{x}{b}{a}"]:
                 if p not in seen:
                     seen.add(p)
                     res.append(p)
-    return sorted(res, key=int)  # ← HAPUS [:500], return semua
+    return sorted(res, key=int)
+
+
+# ========== FUNGSI BARU: 3D DARI IRISAN ==========
+
+def gen3d_dari_irisan(filter_2d, kepala_ekor, top3):
+    """
+    Generate 3D COMBO berdasarkan irisan dari:
+    - filter_2d: hasil filter 2D (sudah dipilih user)
+    - kepala_ekor: kombinasi kepala*ekor
+    - top3: 3 digit teratas untuk posisi tengah
+    
+    Rumus: 3D = (kepala dari kepala_ekor) + (2D dari filter) + (ekor dari kepala_ekor)
+    TAPI dengan aturan bahwa 2D harus mengandung digit dari top3 di posisi tengah
+    """
+    if not filter_2d or not kepala_ekor or not top3:
+        return []
+    
+    # Ekstrak semua digit kepala dan ekor yang valid
+    kepala_set = set()
+    ekor_set = set()
+    for ke in kepala_ekor:
+        if len(ke) == 2:
+            kepala_set.add(int(ke[0]))
+            ekor_set.add(int(ke[1]))
+    
+    hasil = set()
+    
+    # Untuk setiap 2D dari filter
+    for dua_d in filter_2d:
+        if len(dua_d) != 2:
+            continue
+        
+        digit1 = int(dua_d[0])
+        digit2 = int(dua_d[1])
+        
+        # Cek apakah 2D ini mengandung setidaknya satu digit dari top3
+        # (karena untuk 3D, posisi tengah harus dari top3)
+        if digit1 in top3 or digit2 in top3:
+            
+            # Coba semua kombinasi kepala dan ekor
+            for k in kepala_set:
+                for e in ekor_set:
+                    # Format: kepala + 2D + ekor
+                    # 2D bisa diposisikan sebagai (digit1, digit2) atau (digit2, digit1)
+                    
+                    # Opsi 1: k + digit1 + digit2 + e
+                    if digit1 in top3 or digit2 in top3:
+                        angka3d = f"{k}{digit1}{digit2}{e}"
+                        if len(angka3d) == 4:
+                            hasil.add(angka3d)
+                    
+                    # Opsi 2: k + digit2 + digit1 + e (permutasi)
+                    if digit2 in top3 or digit1 in top3:
+                        angka3d = f"{k}{digit2}{digit1}{e}"
+                        if len(angka3d) == 4:
+                            hasil.add(angka3d)
+    
+    return sorted(list(hasil), key=int)
 
 
 # ========== VALIDASI AKURASI ==========
@@ -661,9 +719,10 @@ def ensemble_prediction_adaptive(data, ml_result, h6_stat, h3_stat, optimizer=No
 
 # ========== FUNGSI UTAMA YANG DIPANGGIL ==========
 
-def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False):
+def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False, filter_2d_list=None):
     """
     Fungsi utama yang memanggil semua metode dengan fitur lengkap
+    filter_2d_list: hasil filter 2D dari user (opsional, untuk 3D irisan)
     """
     hasil = {
         'statistik': {},
@@ -719,7 +778,7 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
             # Ensemble Kepala (menjadi 8)
             if kepala_ml:
                 kepala_combined = {}
-                for d in set(kepala_ml[:6] + kepala_stat[:6]):  # Top 6 dari masing-masing
+                for d in set(kepala_ml[:6] + kepala_stat[:6]):
                     score = 0
                     if d in kepala_ml[:6]:
                         score += ml_weight_final * ml_result['certainty']
@@ -728,14 +787,14 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
                     kepala_combined[d] = score
                 
                 sorted_kepala = sorted(kepala_combined.items(), key=lambda x: x[1], reverse=True)
-                kepala_final = [d for d, s in sorted_kepala[:8]]  # 8 KEPALA
+                kepala_final = [d for d, s in sorted_kepala[:8]]
             else:
-                kepala_final = kepala_stat[:8]  # 8 KEPALA
+                kepala_final = kepala_stat[:8]
             
             # Ensemble Ekor (menjadi 8)
             if ekor_ml:
                 ekor_combined = {}
-                for d in set(ekor_ml[:6] + ekor_stat[:6]):  # Top 6 dari masing-masing
+                for d in set(ekor_ml[:6] + ekor_stat[:6]):
                     score = 0
                     if d in ekor_ml[:6]:
                         score += ml_weight_final * ml_result['certainty']
@@ -744,9 +803,9 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
                     ekor_combined[d] = score
                 
                 sorted_ekor = sorted(ekor_combined.items(), key=lambda x: x[1], reverse=True)
-                ekor_final = [d for d, s in sorted_ekor[:8]]  # 8 EKOR
+                ekor_final = [d for d, s in sorted_ekor[:8]]
             else:
-                ekor_final = ekor_stat[:8]  # 8 EKOR
+                ekor_final = ekor_stat[:8]
             
             hasil['ensemble'] = {
                 'h6': h6_ensemble,
@@ -767,13 +826,13 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
             hasil['final']['metode'] = 'ensemble'
         else:
             # ML gagal training
-            hasil['final']['kepala'] = hasil['statistik']['kepala'][:8]  # 8 KEPALA
-            hasil['final']['ekor'] = hasil['statistik']['ekor'][:8]      # 8 EKOR
+            hasil['final']['kepala'] = hasil['statistik']['kepala'][:8]
+            hasil['final']['ekor'] = hasil['statistik']['ekor'][:8]
             hasil['final']['metode'] = 'statistik'
     else:
         # ML tidak digunakan
-        hasil['final']['kepala'] = hasil['statistik']['kepala'][:8]  # 8 KEPALA
-        hasil['final']['ekor'] = hasil['statistik']['ekor'][:8]      # 8 EKOR
+        hasil['final']['kepala'] = hasil['statistik']['kepala'][:8]
+        hasil['final']['ekor'] = hasil['statistik']['ekor'][:8]
         hasil['final']['metode'] = 'statistik'
     
     # Tentukan final untuk 6 ANGKA dan 3D
@@ -784,16 +843,26 @@ def hitung_semua(data, use_ml=True, ml_weight=0.6, optimizer=None, verbose=False
         hasil['final']['h6'] = hasil['statistik']['h6']['h6']
         hasil['final']['h3'] = hasil['statistik']['h3']['h3']
     
-    # Generate kombinasi
+    # Generate kombinasi standar
     hasil['final']['c2'] = gen2d(hasil['final']['h6'])
     hasil['final']['c3'] = gen3d(hasil['final']['c2'], hasil['final']['h3'])
     
-    # Generate Kepala*Ekor (8x8 = 64 kombinasi)
+    # Generate Kepala*Ekor
     ke_combo = []
     for k in hasil['final']['kepala']:
         for e in hasil['final']['ekor']:
             ke_combo.append(f"{k}{e}")
     hasil['final']['ke_combo'] = ke_combo
+    
+    # Generate 3D dari irisan jika filter_2d_list diberikan
+    if filter_2d_list and len(filter_2d_list) > 0:
+        hasil['final']['c3_irisan'] = gen3d_dari_irisan(
+            filter_2d_list, 
+            hasil['final']['ke_combo'], 
+            hasil['final']['h3']
+        )
+    else:
+        hasil['final']['c3_irisan'] = []
     
     return hasil
 
@@ -806,5 +875,6 @@ if __name__ == "__main__":
     print("✅ Machine Learning (RF, LR, GB)")
     print("✅ Anti-Overfitting")
     print("✅ Bobot Adaptif")
-    print("✅ 8 KEPALA & 8 EKOR (peluang 80%)")
+    print("✅ 8 KEPALA & 8 EKOR")
+    print("✅ 3D IRISAN dari FILTER 2D + KEPALA*EKOR")
     print("="*60)
