@@ -1,0 +1,586 @@
+# ==================================================
+# 🔷 PREDIKTOR 6 ANGKA - GOOGLE COLAB (FULL ML VERSION)
+# ==================================================
+
+# 1. Install semua dependencies
+!pip install requests numpy scikit-learn pandas matplotlib seaborn -q
+
+import requests
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import Counter
+from datetime import datetime
+import re
+import warnings
+warnings.filterwarnings('ignore')
+
+# ========== IMPORT ML LIBRARIES ==========
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, cross_val_score, TimeSeriesSplit
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+print("="*70)
+print("🔷 PREDIKTOR 6 ANGKA - GOOGLE COLAB (FULL ML VERSION)")
+print("="*70)
+
+# ========== KONFIGURASI ==========
+GITHUB_CONFIG = {
+    'username': 'MOMODIGITAL',
+    'repo': 'data-vault',
+    'branch': 'main',
+    'path': 'data'
+}
+
+MARKET_NAMES = {
+    1: 'Magnum Cambodia', 2: 'Sydney Pools', 3: 'Sydney Lotto',
+    4: 'China Pools', 5: 'Singapore', 6: 'Taiwan',
+    7: 'Hongkong Pools', 8: 'Hongkong Lotto',
+    9: 'New York Evening', 10: 'Kentucky Evening'
+}
+
+MARKET_FILES = {
+    1: 'magnum-cambodia.csv', 2: 'sydney-pools.csv', 3: 'sydney-lotto.csv',
+    4: 'china-pools.csv', 5: 'singapore.csv', 6: 'taiwan.csv',
+    7: 'hongkong-pools.csv', 8: 'hongkong-lotto.csv',
+    9: 'newyork-evening.csv', 10: 'kentucky-evening.csv'
+}
+
+# ========== FUNGSI FETCH DATA ==========
+def fetch_data(market_key):
+    """Ambil data dari GitHub"""
+    url = f"https://raw.githubusercontent.com/{GITHUB_CONFIG['username']}/{GITHUB_CONFIG['repo']}/{GITHUB_CONFIG['branch']}/{GITHUB_CONFIG['path']}/{MARKET_FILES[market_key]}"
+    
+    try:
+        print(f"📡 Mengambil data {MARKET_NAMES[market_key]}...")
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        return r.text
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
+
+def parse_csv(text):
+    """Parse CSV ke list angka"""
+    if not text:
+        return []
+    results = []
+    for line in text.strip().split('\n')[1:]:
+        if line:
+            parts = line.split(',')
+            if len(parts) >= 2:
+                match = re.search(r'\d{4}', parts[1].strip())
+                if match:
+                    results.append(match.group())
+    return results
+
+# ========== METODE STATISTIK ==========
+def calc6(data):
+    """6 ANGKA - Analisis frekuensi"""
+    if len(data) < 15:
+        return {'h6': []}
+    
+    freq = Counter()
+    for num in data:
+        if len(num) == 4:
+            for d in num:
+                freq[int(d)] += 1
+    
+    sorted_d = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+    return {'h6': [d for d, _ in sorted_d[:6]]}
+
+def calc3(data):
+    """3D TOP - Fokus 3 digit terakhir"""
+    if len(data) < 15:
+        return {'h3': []}
+    
+    # Ambil 3 digit terakhir dari setiap angka
+    last3_digits = []
+    for num in data:
+        if len(num) == 4:
+            last3_digits.extend([int(d) for d in num[1:]])
+    
+    freq = Counter(last3_digits)
+    sorted_d = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+    return {'h3': [d for d, _ in sorted_d[:3]]}
+
+def calc_kepala(data):
+    """KEPALA - Posisi puluhan"""
+    if len(data) < 15:
+        return []
+    
+    kepala_digits = []
+    for num in data:
+        if len(num) >= 3:
+            kepala_digits.append(int(num[2]))
+    
+    freq = Counter(kepala_digits)
+    sorted_d = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+    return [d for d, _ in sorted_d[:7]]
+
+def calc_ekor(data):
+    """EKOR - Posisi satuan"""
+    if len(data) < 15:
+        return []
+    
+    ekor_digits = []
+    for num in data:
+        if len(num) >= 4:
+            ekor_digits.append(int(num[3]))
+    
+    freq = Counter(ekor_digits)
+    sorted_d = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+    return [d for d, _ in sorted_d[:7]]
+
+# ========== METODE ML (LENGKAP) ==========
+class MLPredictor:
+    """Machine Learning Predictor"""
+    
+    def __init__(self):
+        self.models = []
+        self.scaler = StandardScaler()
+        self.accuracies = []
+        self.is_trained = False
+        
+    def extract_features(self, data, index):
+        """Ekstrak 66 fitur"""
+        features = []
+        window = min(20, index)
+        
+        if index < 10:
+            return None
+        
+        start_idx = max(0, index - window)
+        window_data = data[start_idx:index]
+        
+        # 1. Frekuensi setiap digit (10 fitur)
+        digit_freq = [0] * 10
+        for num in window_data:
+            if len(num) == 4:
+                for d in num:
+                    digit_freq[int(d)] += 1
+        total_digits = len(window_data) * 4
+        if total_digits > 0:
+            digit_freq = [f/total_digits for f in digit_freq]
+        features.extend(digit_freq)
+        
+        # 2. Frekuensi per posisi (40 fitur)
+        for pos in range(4):
+            pos_counts = [0] * 10
+            for num in window_data:
+                if len(num) == 4:
+                    d = int(num[pos])
+                    pos_counts[d] += 1
+            if len(window_data) > 0:
+                pos_counts = [c/len(window_data) for c in pos_counts]
+            features.extend(pos_counts)
+        
+        # 3. Trend (1 fitur)
+        if index >= 5:
+            recent_nums = data[index-5:index]
+            recent_avg = sum(int(n) for n in recent_nums if len(n)==4) / (len(recent_nums)*4)
+            older_avg = sum(int(n) for n in data[index-10:index-5] if len(n)==4) / 20
+            features.append(recent_avg - older_avg)
+        else:
+            features.append(0)
+        
+        # 4. Gap analysis (10 fitur)
+        gaps = []
+        for digit in range(10):
+            last_pos = -1
+            for i, num in enumerate(data[:index]):
+                if len(num) == 4 and str(digit) in num:
+                    last_pos = i
+            if last_pos == -1:
+                gaps.append(index)
+            else:
+                gaps.append(index - last_pos - 1)
+        max_gap = max(gaps) if max(gaps) > 0 else 1
+        gaps = [g/max_gap for g in gaps]
+        features.extend(gaps)
+        
+        # 5. Pola 2D terakhir (2 fitur)
+        if len(window_data) >= 2:
+            last_2d = [num[2:] for num in window_data[-2:] if len(num)==4]
+            features.extend([int(last_2d[0])/100 if last_2d else 0, 
+                           int(last_2d[-1])/100 if len(last_2d)>1 else 0])
+        else:
+            features.extend([0, 0])
+        
+        # 6. Statistik (4 fitur)
+        if window_data:
+            nums_int = [int(n) for n in window_data if len(n)==4]
+            if nums_int:
+                features.append(np.mean(nums_int)/10000)
+                features.append(np.std(nums_int)/10000)
+                features.append(min(nums_int)/10000)
+                features.append(max(nums_int)/10000)
+            else:
+                features.extend([0, 0, 0, 0])
+        else:
+            features.extend([0, 0, 0, 0])
+        
+        return features
+    
+    def train(self, data):
+        """Training ML model"""
+        if len(data) < 30:
+            return False
+        
+        X = []
+        y_digits = [[] for _ in range(4)]
+        
+        for i in range(20, len(data)-1):
+            features = self.extract_features(data, i)
+            if features:
+                X.append(features)
+                next_num = data[i+1]
+                if len(next_num) == 4:
+                    for pos in range(4):
+                        y_digits[pos].append(int(next_num[pos]))
+        
+        if len(X) < 10:
+            return False
+        
+        X = np.array(X)
+        X_scaled = self.scaler.fit_transform(X)
+        
+        self.models = []
+        self.accuracies = []
+        
+        for pos in range(4):
+            y = np.array(y_digits[pos])
+            
+            # Random Forest
+            rf = RandomForestClassifier(
+                n_estimators=50, max_depth=5, 
+                min_samples_split=10, random_state=42
+            )
+            
+            # Cross validation
+            cv_scores = cross_val_score(rf, X_scaled, y, cv=3)
+            rf.fit(X_scaled, y)
+            
+            self.models.append(rf)
+            self.accuracies.append(np.mean(cv_scores))
+        
+        self.is_trained = True
+        return True
+    
+    def predict(self, data):
+        """Prediksi dengan ML"""
+        if not self.is_trained:
+            return None
+        
+        latest_features = self.extract_features(data, len(data)-1)
+        if not latest_features:
+            return None
+        
+        X_latest = self.scaler.transform([latest_features])
+        
+        predictions = []
+        probabilities = []
+        top_digits = {i: [] for i in range(4)}
+        
+        for i, model in enumerate(self.models):
+            pred = model.predict(X_latest)[0]
+            predictions.append(pred)
+            
+            if hasattr(model, 'predict_proba'):
+                proba = model.predict_proba(X_latest)[0]
+                prob = max(proba)
+                probabilities.append(prob)
+                
+                # Top 5 digits
+                digit_probs = [(j, proba[j]) for j in range(len(proba))]
+                digit_probs.sort(key=lambda x: x[1], reverse=True)
+                top_digits[i] = [d for d, p in digit_probs[:5]]
+            else:
+                probabilities.append(0.5)
+        
+        return {
+            'predictions': predictions,
+            'probabilities': probabilities,
+            'confidence': np.mean(probabilities),
+            'top_digits': top_digits,
+            'accuracies': self.accuracies
+        }
+
+# ========== GENERATE KOMBINASI ==========
+def gen2d(top6):
+    """Generate 2D dari top 6"""
+    result = []
+    for i in range(100):
+        s = f"{i:02d}"
+        if int(s[0]) in top6 or int(s[1]) in top6:
+            result.append(s)
+    return result
+
+def gen3d(c2, top3):
+    """Generate 3D combo"""
+    if not c2 or not top3:
+        return []
+    res, seen = [], set()
+    for s in c2[:100]:  # Batasi untuk performa
+        a, b = int(s[0]), int(s[1])
+        for x in top3:
+            for p in [f"{a}{b}{x}", f"{a}{x}{b}", f"{b}{a}{x}", 
+                     f"{b}{x}{a}", f"{x}{a}{b}", f"{x}{b}{a}"]:
+                if p not in seen:
+                    seen.add(p)
+                    res.append(p)
+    return sorted(res, key=int)[:500]  # Batasi 500 kombinasi
+
+# ========== MAIN EXECUTION ==========
+print("\n📊 PILIH PASARAN:")
+for k, v in MARKET_NAMES.items():
+    print(f"   {k}. {v}")
+
+try:
+    choice = int(input("\n➤ Nomor Pasaran (1-10): "))
+    if choice not in MARKET_NAMES:
+        raise ValueError
+except:
+    print("❌ Input salah! Pakai default: Singapore (5)")
+    choice = 5
+
+# Fetch data
+csv = fetch_data(choice)
+if not csv:
+    print("❌ Gagal ambil data")
+else:
+    data = parse_csv(csv)
+    print(f"✅ Data: {len(data)} putaran")
+    
+    # ===== 1. METODE STATISTIK =====
+    print("\n📊 Metode Statistik...")
+    h6_stat = calc6(data)
+    h3_stat = calc3(data)
+    kepala = calc_kepala(data)
+    ekor = calc_ekor(data)
+    
+    # ===== 2. METODE ML =====
+    print("🤖 Metode Machine Learning...")
+    ml = MLPredictor()
+    
+    if ml.train(data):
+        ml_result = ml.predict(data)
+        
+        # Tampilkan hasil ML
+        print(f"\n📈 Hasil ML (Confidence: {ml_result['confidence']:.2%}):")
+        print(f"   Prediksi 4D: {''.join(map(str, ml_result['predictions']))}")
+        print(f"   Akurasi per posisi:")
+        for i, acc in enumerate(ml_result['accuracies']):
+            posisi = ['Ribuan', 'Ratusan', 'Puluhan', 'Satuan'][i]
+            print(f"     {posisi}: {acc:.2%}")
+        
+        # Ensemble sederhana
+        print("\n🔄 Ensemble (ML + Statistik)...")
+        
+        # Kombinasikan hasil
+        all_digits = set()
+        all_digits.update(h6_stat['h6'])
+        for pos, tops in ml_result['top_digits'].items():
+            all_digits.update(tops[:3])
+        
+        # Hitung skor ensemble
+        ensemble_scores = {}
+        for d in all_digits:
+            score = 0
+            if d in h6_stat['h6']:
+                score += 0.4
+            for pos, tops in ml_result['top_digits'].items():
+                if d in tops[:3]:
+                    score += 0.15 * ml_result['confidence']
+            ensemble_scores[d] = score
+        
+        sorted_ensemble = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)
+        h6_final = [d for d, _ in sorted_ensemble[:6]]
+        
+        # 3D ensemble
+        h3_final = h3_stat['h3']
+    else:
+        print("⚠️ Data kurang untuk ML, pakai statistik saja")
+        h6_final = h6_stat['h6']
+        h3_final = h3_stat['h3']
+        ml_result = None
+    
+    # ===== GENERATE KOMBINASI =====
+    c2 = gen2d(h6_final)
+    c3 = gen3d(c2, h3_final)
+    
+    ke_combo = []
+    for k in kepala[:5]:
+        for e in ekor[:5]:
+            ke_combo.append(f"{k}{e}")
+    
+    # ===== TAMPILKAN HASIL =====
+    print("\n" + "="*70)
+    print(f"🔷 HASIL FINAL: {MARKET_NAMES[choice]}")
+    print("="*70)
+    print(f"📊 Total Data: {len(data)} putaran")
+    print(f"📅 Tanggal: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    print("-"*70)
+    
+    print(f"\n🔢 6 ANGKA: {' - '.join(map(str, h6_final))}")
+    print(f"🏆 3D TOP : {' - '.join(map(str, h3_final))}")
+    print(f"\n🎯 7 KEPALA: {' - '.join(map(str, kepala))}")
+    print(f"🎯 7 EKOR : {' - '.join(map(str, ekor))}")
+    
+    print(f"\n📊 2D AUTO ({len(c2)} kombinasi):")
+    if len(c2) <= 50:
+        print("  " + " ".join(c2))
+    else:
+        print("  " + " ".join(c2[:30]) + f" ... ({len(c2)-30} lainnya)")
+    
+    if c3:
+        print(f"\n🎲 3D COMBO ({len(c3)} kombinasi):")
+        if len(c3) <= 30:
+            print("  " + " ".join(c3))
+        else:
+            print("  " + " ".join(c3[:30]) + f" ... ({len(c3)-30} lainnya)")
+    
+    print(f"\n💎 KEPALA*EKOR ({len(ke_combo)} kombinasi):")
+    print("  " + " ".join(ke_combo[:30]) + (f" ... ({len(ke_combo)-30} lainnya)" if len(ke_combo) > 30 else ""))
+    
+    # ===== VISUALISASI (SUDAH DIPERBAIKI) =====
+    print("\n📈 VISUALISASI DISTRIBUSI DIGIT:")
+    
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    
+    # 1. Frekuensi semua digit
+    all_digits = []
+    for num in data:
+        if len(num) == 4:
+            all_digits.extend([int(d) for d in num])
+    freq_all = Counter(all_digits)
+    
+    bars = axes[0,0].bar(range(10), [freq_all.get(i,0) for i in range(10)], 
+                         color='skyblue', edgecolor='navy')
+    axes[0,0].set_title('📊 Frekuensi Semua Digit', fontsize=12, fontweight='bold')
+    axes[0,0].set_xlabel('Digit', fontsize=10)
+    axes[0,0].set_ylabel('Frekuensi', fontsize=10)
+    axes[0,0].set_xticks(range(10))
+    
+    # Tambah nilai di atas bar
+    for bar in bars:
+        height = bar.get_height()
+        if height > 0:
+            axes[0,0].text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                           f'{int(height)}', ha='center', va='bottom', fontsize=9)
+    
+    # 2. Frekuensi per posisi
+    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
+    pos_labels = ['Posisi 1 (Ribuan)', 'Posisi 2 (Ratusan)', 
+                  'Posisi 3 (Puluhan)', 'Posisi 4 (Satuan)']
+    
+    for p in range(4):
+        pos_digits = []
+        for num in data:
+            if len(num) == 4:
+                pos_digits.append(int(num[p]))
+        freq_pos = Counter(pos_digits)
+        
+        x_pos = np.arange(10) + p*0.2
+        bars = axes[0,1].bar(x_pos, [freq_pos.get(i,0) for i in range(10)], 
+                            width=0.2, label=pos_labels[p], 
+                            color=colors[p], alpha=0.8, edgecolor='black', linewidth=0.5)
+    
+    axes[0,1].set_title('📊 Frekuensi per Posisi', fontsize=12, fontweight='bold')
+    axes[0,1].set_xlabel('Digit', fontsize=10)
+    axes[0,1].set_ylabel('Frekuensi', fontsize=10)
+    axes[0,1].set_xticks(np.arange(10) + 0.3)
+    axes[0,1].set_xticklabels(range(10))
+    axes[0,1].legend(loc='upper right', fontsize=8)
+    axes[0,1].grid(True, alpha=0.3)
+    
+    # 3. Korelasi antar posisi (DIPERBAIKI)
+    df_data = []
+    for num in data[-50:]:  # 50 data terakhir
+        if len(num) == 4:
+            df_data.append([int(num[0]), int(num[1]), int(num[2]), int(num[3])])
+    
+    if df_data:
+        df = pd.DataFrame(df_data, columns=['Ribuan', 'Ratusan', 'Puluhan', 'Satuan'])
+        corr = df.corr()
+        
+        sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', center=0,
+                    square=True, linewidths=1, cbar_kws={"shrink": 0.8},
+                    ax=axes[1,0], annot_kws={'size': 10})
+        axes[1,0].set_title('🔗 Korelasi Antar Posisi', fontsize=12, fontweight='bold')
+    else:
+        axes[1,0].text(0.5, 0.5, 'Data tidak cukup', ha='center', va='center', fontsize=12)
+        axes[1,0].set_title('🔗 Korelasi Antar Posisi', fontsize=12, fontweight='bold')
+    
+    # 4. Trend (DIPERBAIKI)
+    if len(data) > 20:
+        numeric_data = []
+        for num in data[-50:]:
+            if len(num) == 4:
+                numeric_data.append(int(num))
+        
+        if numeric_data:
+            x = range(len(numeric_data))
+            axes[1,1].plot(x, numeric_data, marker='.', linestyle='-', 
+                          color='purple', alpha=0.6, linewidth=1, markersize=4)
+            
+            # Trend line
+            if len(numeric_data) > 2:
+                z = np.polyfit(x, numeric_data, 1)
+                p = np.poly1d(z)
+                axes[1,1].plot(x, p(x), "r--", alpha=0.8, 
+                              label=f'Trend (slope: {z[0]:.2f})')
+                
+                # Prediksi 5 langkah ke depan
+                x_pred = range(len(numeric_data), len(numeric_data)+5)
+                y_pred = p(x_pred)
+                axes[1,1].plot(x_pred, y_pred, 'g--', alpha=0.6, 
+                              label='Prediksi 5 step')
+            
+            axes[1,1].set_title('📈 Trend 50 Putaran Terakhir', fontsize=12, fontweight='bold')
+            axes[1,1].set_xlabel('Putaran ke-', fontsize=10)
+            axes[1,1].set_ylabel('Nilai Angka', fontsize=10)
+            axes[1,1].legend(fontsize=8)
+            axes[1,1].grid(True, alpha=0.3)
+        else:
+            axes[1,1].text(0.5, 0.5, 'Data tidak valid', ha='center', va='center', fontsize=12)
+            axes[1,1].set_title('📈 Trend 50 Putaran Terakhir', fontsize=12, fontweight='bold')
+    else:
+        axes[1,1].text(0.5, 0.5, 'Minimal 20 putaran', ha='center', va='center', fontsize=12)
+        axes[1,1].set_title('📈 Trend 50 Putaran Terakhir', fontsize=12, fontweight='bold')
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # ===== SIMPAN HASIL =====
+    save = input("\n💾 Simpan hasil ke file? (y/n): ").lower()
+    if save == 'y':
+        filename = f"prediktor_colab_{choice}_{datetime.now().strftime('%H%M%S')}.txt"
+        
+        with open(filename, 'w') as f:
+            f.write("="*50 + "\n")
+            f.write(f"PREDIKTOR 6 ANGKA - {MARKET_NAMES[choice]}\n")
+            f.write("="*50 + "\n")
+            f.write(f"Tanggal: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+            f.write(f"Data: {len(data)} putaran\n\n")
+            f.write(f"6 ANGKA: {'*'.join(map(str, h6_final))}\n")
+            f.write(f"3D TOP: {'*'.join(map(str, h3_final))}\n")
+            f.write(f"7 KEPALA: {'*'.join(map(str, kepala))}\n")
+            f.write(f"7 EKOR: {'*'.join(map(str, ekor))}\n\n")
+            f.write(f"2D ({len(c2)}):\n" + "*".join(c2) + "\n")
+            if c3:
+                f.write(f"\n3D COMBO ({len(c3)}):\n" + "*".join(c3[:200]) + "\n")
+        
+        print(f"✅ Tersimpan: {filename}")
+        
+        # Download file
+        from google.colab import files
+        files.download(filename)
+
+print("\n" + "="*70)
+print("✅ SELESAI! Copy link ini untuk share ke teman:")
+print("🔗 https://colab.research.google.com" + "/notebook#fileId=..." )
+print("="*70)
